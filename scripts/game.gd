@@ -1050,12 +1050,13 @@ func _build_gun() -> void:
 		mesh = gun_rig.get_child(0)          # glock.fbx placed in main.tscn
 	else:
 		gun_rig = Node3D.new(); gun_rig.name = "Glock"; add_child(gun_rig)
-		mesh = (load("res://assets/glock/glock.fbx") as PackedScene).instantiate()
+		var gm := MeshInstance3D.new(); gm.mesh = load("res://assets/glock/glock_mesh.res"); mesh = gm   # importer-independent mesh
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = load("res://assets/glock/glock_BaseColor.jpg")
 	mat.normal_enabled = true; mat.normal_texture = load("res://assets/glock/glock_Normal.jpg")
 	mat.roughness_texture = load("res://assets/glock/glock_Roughness.jpg"); mat.roughness = 1.0
 	mat.metallic_texture = load("res://assets/glock/glock_Metallic.jpg"); mat.metallic = 1.0
+	if mesh is MeshInstance3D: (mesh as MeshInstance3D).material_override = mat
 	for mi: MeshInstance3D in mesh.find_children("*", "MeshInstance3D", true, false): mi.material_override = mat
 	# model space: barrel along -x, up +z (centimetres) -> rig space: muzzle +z, up +y, metres; grip at the origin
 	var M := Basis(Vector3(0, 0, -1), Vector3(-1, 0, 0), Vector3(0, 1, 0))

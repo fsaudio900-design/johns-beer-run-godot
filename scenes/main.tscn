@@ -17,7 +17,11 @@
 [ext_resource type="PackedScene" path="res://assets/john/john.fbx" id="m_john"]
 [ext_resource type="PackedScene" path="res://assets/cars/m1.glb" id="m_car"]
 [ext_resource type="PackedScene" path="res://assets/chars/Visitor.glb" id="m_visitor"]
-[ext_resource type="PackedScene" path="res://assets/glock/glock.fbx" id="m_glock"]
+[ext_resource type="ArrayMesh" path="res://assets/glock/glock_mesh.res" id="m_glock"]
+[ext_resource type="Texture2D" path="res://assets/glock/glock_BaseColor.jpg" id="t_gc"]
+[ext_resource type="Texture2D" path="res://assets/glock/glock_Normal.jpg" id="t_gn"]
+[ext_resource type="Texture2D" path="res://assets/glock/glock_Roughness.jpg" id="t_gr"]
+[ext_resource type="Texture2D" path="res://assets/glock/glock_Metallic.jpg" id="t_gm"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.01, 0.015, 0.04, 1)
@@ -53,6 +57,14 @@ fog_light_color = Color(0.06, 0.07, 0.11, 1)
 fog_density = 0.003
 adjustment_enabled = true
 adjustment_contrast = 1.05
+
+[sub_resource type="StandardMaterial3D" id="glock_mat"]
+albedo_texture = ExtResource("t_gc")
+metallic = 1.0
+metallic_texture = ExtResource("t_gm")
+roughness_texture = ExtResource("t_gr")
+normal_enabled = true
+normal_texture = ExtResource("t_gn")
 
 [sub_resource type="CapsuleShape3D" id="cap"]
 radius = 0.24
@@ -341,7 +353,9 @@ script = ExtResource("s_visitor")
 [node name="Glock" type="Node3D" parent="."]
 transform = Transform3D(-2.71714e-08, -0.62161, 0.783327, 1, -4.37114e-08, 0, 3.42403e-08, 0.783327, 0.62161, -3.08, 0.658, 2.46)
 
-[node name="glock" parent="Glock" instance=ExtResource("m_glock")]
+[node name="glock" type="MeshInstance3D" parent="Glock"]
+mesh = ExtResource("m_glock")
+material_override = SubResource("glock_mat")
 transform = Transform3D(0, -3.97872, 0, 0, 0, 3.97872, -3.97872, 0, 0, 0.00557021, 0.0358085, 0.0616702)
 
 [node name="Camera3D" type="Camera3D" parent="."]
