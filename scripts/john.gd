@@ -65,10 +65,16 @@ func _set_can(v: bool) -> void:
 
 # ------------------------------------------------------------------ model
 func _build_model() -> void:
-	model = Node3D.new(); model.name = "Model"; add_child(model)
-	fit = Node3D.new(); fit.name = "Fit"; model.add_child(fit)
-	var john: Node3D = (load("res://assets/john/john.fbx") as PackedScene).instantiate()
-	fit.add_child(john)
+	var adopted := has_node("Model/Fit")        # placed in main.tscn so John shows in the editor
+	var john: Node3D
+	if adopted:
+		model = get_node("Model"); fit = get_node("Fit") if has_node("Fit") else get_node("Model/Fit")
+		john = fit.get_child(0)
+	else:
+		model = Node3D.new(); model.name = "Model"; add_child(model)
+		fit = Node3D.new(); fit.name = "Fit"; model.add_child(fit)
+		john = (load("res://assets/john/john.fbx") as PackedScene).instantiate()
+		fit.add_child(john)
 	skel = john.find_child("Skeleton3D", true, false)
 	var ap: AnimationPlayer = john.find_child("AnimationPlayer", true, false)
 	if ap:
@@ -101,6 +107,7 @@ func _build_model() -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		mi.extra_cull_margin = 2.0
 
+	if adopted: return
 	# orient + scale: head up, face +Z, 1.75 m tall, rig origin at John's position (as in the web build)
 	var S: Transform3D = fit.global_transform.affine_inverse() * skel.global_transform
 	var bp := func(n: String) -> Vector3: return S * skel.get_bone_global_rest(skel.find_bone(n)).origin

@@ -1,4 +1,4 @@
-# John's Beer Run: Godot 4.3 port (v2.5, stage 5)
+# John's Beer Run: Godot 4.3 port (v2.6, stage 5)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 
@@ -56,6 +56,17 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
 - **R:** reload.
 - **In the car:** W gas, S brake/reverse, A/D steer, Space handbrake, H horn, E get out.
 - **Esc:** free the mouse. Click to capture it again.
+
+## Editing in the Godot editor
+Open `scenes/main.tscn`. Everything is placed in the scene, so you can see it and move it:
+- **World:** the cabin, the neighborhood, the town, the Fuel Stop and the terrain.
+- **World → Streetlights:** 8 lamps. You can move, duplicate or delete them, and each one's light, fill and glow will follow. You can also change a lamp's brightness, color and range on its **Light** node.
+- **John:** his starting spot. Where he spawns at the start of a night is set in code (in front of the recliner).
+- **M1:** the car. Its parking spot is set in `car.gd`.
+- **Visitor:** he's hidden until he walks up during the game.
+- **Glock:** the gun on the side table.
+
+A few things are still set up when the game starts and only show up when you press F5: materials and tints, collision, the wheel pivots, and the effects.
 
 ## Project layout
 - `scripts/game.gd`: the game controller (states, actions, timing, camera, effects).

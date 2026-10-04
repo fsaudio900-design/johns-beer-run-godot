@@ -11,12 +11,12 @@ func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
 	var shapes := 0
 	for n in WORLD:
-		var ps: PackedScene = load("res://assets/world/%s.glb" % n)
-		if ps == null:
-			push_warning("missing world chunk " + n); continue
-		var inst := ps.instantiate()
-		inst.name = n
-		add_child(inst)
+		var inst := get_node_or_null(n)          # placed in main.tscn so it shows in the editor
+		if inst == null:
+			var ps: PackedScene = load("res://assets/world/%s.glb" % n)
+			if ps == null:
+				push_warning("missing world chunk " + n); continue
+			inst = ps.instantiate(); inst.name = n; add_child(inst)
 		shapes += _prepare(inst)
 	_add_streetlights()
 	print("[world] loaded %d chunks, %d collision shapes in %d ms" % [WORLD.size(), shapes, Time.get_ticks_msec() - t0])
@@ -92,6 +92,10 @@ func lamp_heads() -> Array[Vector3]:
 
 func _add_streetlights() -> void:
 	var heads := lamp_heads()
+	var placed := get_node_or_null("Streetlights")    # lamps placed in the editor: move or duplicate them freely
+	if placed:
+		heads.clear()
+		for lamp in placed.get_children(): heads.append((lamp as Node3D).global_position)
 	# retire the exported lamp lights (they sat right under these heads)
 	for l: Light3D in find_children("*", "OmniLight3D", true, false):
 		for h in heads:
@@ -102,6 +106,7 @@ func _add_streetlights() -> void:
 	glow_mat.albedo_texture = glow_tex; glow_mat.albedo_color = Color(0.75, 0.56, 0.32)
 	glow_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; glow_mat.no_depth_test = false
 	var glow_mesh := QuadMesh.new(); glow_mesh.size = Vector2(2.4, 2.4)
+	if placed: return
 	for h in heads:
 		var spot := SpotLight3D.new(); spot.name = "StreetLamp"
 		spot.light_color = LAMP_COLOR; spot.light_energy = 14.0

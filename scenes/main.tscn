@@ -1,11 +1,23 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/game.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/world.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/john.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/hud.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/menu.gd" id="5"]
-[ext_resource type="Shader" path="res://scripts/post.gdshader" id="6"]
+[ext_resource type="Script" path="res://scripts/game.gd" id="s_game"]
+[ext_resource type="Script" path="res://scripts/world.gd" id="s_world"]
+[ext_resource type="Script" path="res://scripts/john.gd" id="s_john"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="s_hud"]
+[ext_resource type="Script" path="res://scripts/menu.gd" id="s_menu"]
+[ext_resource type="Script" path="res://scripts/car.gd" id="s_car"]
+[ext_resource type="Script" path="res://scripts/visitor.gd" id="s_visitor"]
+[ext_resource type="Shader" path="res://scripts/post.gdshader" id="sh_post"]
+[ext_resource type="Texture2D" path="res://assets/fx/glow_add.png" id="t_glow"]
+[ext_resource type="PackedScene" path="res://assets/world/JBR_Terrain.glb" id="w_terrain"]
+[ext_resource type="PackedScene" path="res://assets/world/JBR_Cabin.glb" id="w_cabin"]
+[ext_resource type="PackedScene" path="res://assets/world/JBR_Neighborhood.glb" id="w_hood"]
+[ext_resource type="PackedScene" path="res://assets/world/JBR_Town.glb" id="w_town"]
+[ext_resource type="PackedScene" path="res://assets/world/JBR_FuelStop.glb" id="w_fuel"]
+[ext_resource type="PackedScene" path="res://assets/john/john.fbx" id="m_john"]
+[ext_resource type="PackedScene" path="res://assets/cars/m1.glb" id="m_car"]
+[ext_resource type="PackedScene" path="res://assets/chars/Visitor.glb" id="m_visitor"]
+[ext_resource type="PackedScene" path="res://assets/glock/glock.fbx" id="m_glock"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.01, 0.015, 0.04, 1)
@@ -46,27 +58,291 @@ adjustment_contrast = 1.05
 radius = 0.24
 height = 1.75
 
+[sub_resource type="BoxShape3D" id="carbox"]
+size = Vector3(1.94, 0.95, 4.4)
+
 [sub_resource type="ShaderMaterial" id="post_mat"]
-shader = ExtResource("6")
+shader = ExtResource("sh_post")
+
+[sub_resource type="StandardMaterial3D" id="glow_mat"]
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(0.75, 0.56, 0.32, 1)
+albedo_texture = ExtResource("t_glow")
+billboard_mode = 1
+
+[sub_resource type="QuadMesh" id="glow_quad"]
+material = SubResource("glow_mat")
+size = Vector2(2.4, 2.4)
 
 [node name="Main" type="Node3D"]
-script = ExtResource("1")
+script = ExtResource("s_game")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("env")
 
 [node name="World" type="Node3D" parent="."]
-script = ExtResource("2")
+script = ExtResource("s_world")
+
+[node name="JBR_Terrain" parent="World" instance=ExtResource("w_terrain")]
+
+[node name="JBR_Cabin" parent="World" instance=ExtResource("w_cabin")]
+
+[node name="JBR_Neighborhood" parent="World" instance=ExtResource("w_hood")]
+
+[node name="JBR_Town" parent="World" instance=ExtResource("w_town")]
+
+[node name="JBR_FuelStop" parent="World" instance=ExtResource("w_fuel")]
+
+[node name="Streetlights" type="Node3D" parent="World"]
+
+[node name="Lamp1" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.08956, 4.52, -35.8745)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp1"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp2" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.38711, 4.52, -23.2436)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp2"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp3" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.00859, 4.52, -17.276)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp3"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp4" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 4.52, -21.35)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp4"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp5" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 4.52, -30.65)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp5"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp6" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -78, 4.52, -21.35)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp6"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp7" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 4.52, -30.65)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp7"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp7"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp7"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
+
+[node name="Lamp8" type="Node3D" parent="World/Streetlights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -104, 4.52, -21.35)
+
+[node name="Light" type="SpotLight3D" parent="World/Streetlights/Lamp8"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.1, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 14.0
+shadow_enabled = true
+shadow_blur = 1.5
+spot_range = 18.0
+spot_attenuation = 0.9
+spot_angle = 68.0
+spot_angle_attenuation = 0.6
+
+[node name="Fill" type="OmniLight3D" parent="World/Streetlights/Lamp8"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.6, 0)
+light_color = Color(1, 0.75, 0.47, 1)
+light_energy = 1.3
+omni_range = 13.0
+omni_attenuation = 1.2
+
+[node name="Glow" type="MeshInstance3D" parent="World/Streetlights/Lamp8"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.07, 0)
+cast_shadow = 0
+mesh = SubResource("glow_quad")
 
 [node name="John" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.02, 1.85)
-script = ExtResource("3")
+script = ExtResource("s_john")
 floor_snap_length = 0.3
 floor_max_angle = 0.87
 
 [node name="Collision" type="CollisionShape3D" parent="John"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
 shape = SubResource("cap")
+
+[node name="Model" type="Node3D" parent="John"]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
+
+[node name="Fit" type="Node3D" parent="John/Model"]
+transform = Transform3D(0.175115, -4.70405e-10, 5.52872e-17, 4.70349e-10, 0.175094, 0.00270003, -7.25303e-12, -0.00270003, 0.175094, 0, 0, 0)
+
+[node name="john" parent="John/Model/Fit" instance=ExtResource("m_john")]
+
+[node name="M1" type="CharacterBody3D" parent="."]
+transform = Transform3D(0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, 0.5, 5.35, -0.41, -18.2924)
+script = ExtResource("s_car")
+
+[node name="Collision" type="CollisionShape3D" parent="M1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+shape = SubResource("carbox")
+
+[node name="m1" parent="M1" instance=ExtResource("m_car")]
+
+[node name="Visitor" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 1.02, -0.45, -6.0)
+script = ExtResource("s_visitor")
+
+[node name="Model" parent="Visitor" instance=ExtResource("m_visitor")]
+
+[node name="Glock" type="Node3D" parent="."]
+transform = Transform3D(-2.71714e-08, -0.62161, 0.783327, 1, -4.37114e-08, 0, 3.42403e-08, 0.783327, 0.62161, -3.08, 0.658, 2.46)
+
+[node name="glock" parent="Glock" instance=ExtResource("m_glock")]
+transform = Transform3D(0, -3.97872, 0, 0, 0, 3.97872, -3.97872, 0, 0, 0.00557021, 0.0358085, 0.0616702)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 2.2, 5.8)
@@ -86,7 +362,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 
 [node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("4")
+script = ExtResource("s_hud")
 
 [node name="Menu" type="CanvasLayer" parent="."]
-script = ExtResource("5")
+script = ExtResource("s_menu")

@@ -163,10 +163,13 @@ func _ready() -> void:
 	_build_tv()
 	_build_fx()
 	_build_gun()
-	car = CharacterBody3D.new(); car.set_script(load("res://scripts/car.gd")); car.name = "M1"; add_child(car)
+	car = get_node_or_null("M1")
+	if car == null: car = CharacterBody3D.new(); car.set_script(load("res://scripts/car.gd")); car.name = "M1"; add_child(car)
 	car.crashed.connect(func(k): Sfx.play("crash", linear_to_db(0.35 + 0.65 * k)))
-	visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"
-	add_child(visitor); visitor.visible = false
+	visitor = get_node_or_null("Visitor")
+	if visitor == null:
+		visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"; add_child(visitor)
+	visitor.visible = false
 	menu.start_pressed.connect(start)
 	menu.again_pressed.connect(func(): reset(); _capture(true))
 	menu.menu_pressed.connect(to_main_menu)
@@ -1008,24 +1011,26 @@ func toggle_peep(on: bool) -> void:
 
 # ------------------------------------------------------------------ stage 4: the Glock
 func _build_gun() -> void:
-	gun_rig = Node3D.new(); gun_rig.name = "Glock"; add_child(gun_rig)
-	var src: Node3D = (load("res://assets/glock/glock.fbx") as PackedScene).instantiate()
-	var gm: MeshInstance3D = src.find_children("*", "MeshInstance3D", true, false)[0]
-	var mesh := MeshInstance3D.new(); mesh.mesh = gm.mesh
+	gun_rig = get_node_or_null("Glock")
+	var mesh: Node3D
+	if gun_rig and gun_rig.get_child_count() > 0:
+		mesh = gun_rig.get_child(0)          # glock.fbx placed in main.tscn
+	else:
+		gun_rig = Node3D.new(); gun_rig.name = "Glock"; add_child(gun_rig)
+		mesh = (load("res://assets/glock/glock.fbx") as PackedScene).instantiate()
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = load("res://assets/glock/glock_BaseColor.jpg")
 	mat.normal_enabled = true; mat.normal_texture = load("res://assets/glock/glock_Normal.jpg")
 	mat.roughness_texture = load("res://assets/glock/glock_Roughness.jpg"); mat.roughness = 1.0
 	mat.metallic_texture = load("res://assets/glock/glock_Metallic.jpg"); mat.metallic = 1.0
-	mesh.material_override = mat
-	src.free()
+	for mi: MeshInstance3D in mesh.find_children("*", "MeshInstance3D", true, false): mi.material_override = mat
 	# model space: barrel along -x, up +z (centimetres) -> rig space: muzzle +z, up +y, metres; grip at the origin
 	var M := Basis(Vector3(0, 0, -1), Vector3(-1, 0, 0), Vector3(0, 1, 0))
 	var k := 0.187 / 4.7
 	var grip: Vector3 = (M * Vector3(1.55, 0.14, -0.9)) * k
 	mesh.transform = Transform3D(M.scaled(Vector3.ONE * k / 0.01), -grip)
 	gun_muzzle = (M * Vector3(-2.45, 0.14, 0.82)) * k - grip
-	gun_rig.add_child(mesh)
+	if mesh.get_parent() == null: gun_rig.add_child(mesh)
 	flash_spr = Sprite3D.new(); flash_spr.texture = glow_tex; flash_spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED; flash_spr.shaded = false
 	flash_spr.modulate = Color(1, 0.82, 0.47); flash_spr.visible = false; add_child(flash_spr)
 	var fm := StandardMaterial3D.new(); fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD; fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

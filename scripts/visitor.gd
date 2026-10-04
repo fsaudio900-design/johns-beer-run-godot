@@ -14,8 +14,9 @@ var blend := {knock = 0.0, walk = 0.0, wave = 0.0, hands = 0.0}
 var hips_y := 0.95
 
 func _ready() -> void:
-	var m: Node3D = (load(model_path) as PackedScene).instantiate()
-	add_child(m)
+	var m: Node3D = get_node_or_null("Model")
+	if m == null:
+		m = (load(model_path) as PackedScene).instantiate(); add_child(m)
 	for node in m.find_children("J_*", "", true, false):
 		J[String(node.name).trim_prefix("J_")] = node
 	if J.has("hips"): hips_y = J.hips.position.y

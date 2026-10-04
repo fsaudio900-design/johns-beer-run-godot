@@ -30,16 +30,18 @@ signal crashed(strength: float)
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
-	var col := CollisionShape3D.new(); var box := BoxShape3D.new(); box.size = Vector3(1.94, 0.95, 4.4)
-	col.shape = box; col.position = Vector3(0, 0.78, 0); add_child(col)
+	if not has_node("Collision"):
+		var col := CollisionShape3D.new(); col.name = "Collision"; var box := BoxShape3D.new(); box.size = Vector3(1.94, 0.95, 4.4)
+		col.shape = box; col.position = Vector3(0, 0.78, 0); add_child(col)
 	_build_model()
 	var hx := OUT_C.x + cos(HOME_PHI) * 8.9; var hz := OUT_C.y + sin(HOME_PHI) * 8.9
 	home = Transform3D(Basis(Vector3.UP, atan2(-sin(HOME_PHI), cos(HOME_PHI))), Vector3(hx, OUTG + 0.04, hz))
 	park()
 
 func _build_model() -> void:
-	model = (load("res://assets/cars/m1.glb") as PackedScene).instantiate()
-	add_child(model)
+	model = get_node_or_null("m1")
+	if model == null:
+		model = (load("res://assets/cars/m1.glb") as PackedScene).instantiate(); add_child(model)
 	var red := StandardMaterial3D.new()
 	red.albedo_texture = load("res://assets/cars/m1_ext_red.jpg"); red.metallic = 0.3; red.roughness = 0.3
 	red.clearcoat_enabled = true; red.clearcoat = 1.0; red.clearcoat_roughness = 0.05
