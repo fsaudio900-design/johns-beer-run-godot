@@ -1,4 +1,4 @@
-# John's Beer Run: Godot 4.3 port (v2.3, stage 4)
+# John's Beer Run: Godot 4.3 port (v2.4, stage 4)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 

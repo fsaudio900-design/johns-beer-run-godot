@@ -108,6 +108,8 @@ var smokes: Array = []
 var cats: Array = []
 var zzz: Array = []
 var puff_tex: Texture2D = preload("res://assets/fx/puff.png")
+var glow_tex: Texture2D = preload("res://assets/fx/glow_add.png")
+var out_mix := 0.0
 var cat_tex: Texture2D = preload("res://assets/fx/cat.png")
 # ---- stage 3: the visitor + front door peephole ----
 var visitor: Node3D
@@ -702,7 +704,9 @@ func _process(dt: float) -> void:
 			tl.global_position = john.global_position + Vector3(cos(clock_t) * 1.5, 2.4, sin(clock_t) * 1.5)
 			tl.light_color = Color.from_hsv(fmod(hh + 0.5, 1.0), 1, 1); tl.light_energy = 3.2 * trip_vis * 0.9
 	else:
-		env.ambient_light_color = amb_base; env.ambient_light_energy = amb_energy
+		out_mix = lerp(out_mix, 1.0 if is_outside() else 0.0, 1.0 - exp(-dt * 2.0))
+		env.ambient_light_color = amb_base.lerp(Color(0.45, 0.52, 0.75), out_mix)
+		env.ambient_light_energy = amb_energy * (1.0 + 1.3 * out_mix)
 		if tl: tl.light_energy = 0
 	hud.set_pill("trip", trip_t)
 
@@ -1000,10 +1004,10 @@ func _build_gun() -> void:
 	mesh.transform = Transform3D(M.scaled(Vector3.ONE * k / 0.01), -grip)
 	gun_muzzle = (M * Vector3(-2.45, 0.14, 0.82)) * k - grip
 	gun_rig.add_child(mesh)
-	flash_spr = Sprite3D.new(); flash_spr.texture = puff_tex; flash_spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED; flash_spr.shaded = false
+	flash_spr = Sprite3D.new(); flash_spr.texture = glow_tex; flash_spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED; flash_spr.shaded = false
 	flash_spr.modulate = Color(1, 0.82, 0.47); flash_spr.visible = false; add_child(flash_spr)
 	var fm := StandardMaterial3D.new(); fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD; fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	fm.albedo_texture = puff_tex; fm.albedo_color = Color(1, 0.82, 0.47); fm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fm.albedo_texture = glow_tex; fm.albedo_color = Color(1, 0.82, 0.47); fm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	flash_spr.material_override = fm
 	flash_light = OmniLight3D.new(); flash_light.light_color = Color(1, 0.75, 0.44); flash_light.omni_range = 6; flash_light.light_energy = 0; add_child(flash_light)
 	hole_mat = StandardMaterial3D.new(); hole_mat.albedo_color = Color(0.04, 0.03, 0.02, 0.92); hole_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -1109,10 +1113,10 @@ func _tracer(a: Vector3, b: Vector3) -> void:
 	add_child(mi); tracers.append({node = mi, mat = m, life = 0.0})
 
 func _spark(p: Vector3, v: Vector3) -> void:
-	var s := Sprite3D.new(); s.texture = puff_tex; s.billboard = BaseMaterial3D.BILLBOARD_ENABLED; s.shaded = false
+	var s := Sprite3D.new(); s.texture = glow_tex; s.billboard = BaseMaterial3D.BILLBOARD_ENABLED; s.shaded = false
 	s.modulate = Color(1, 0.75, 0.35); s.pixel_size = 0.035 / 128.0
 	var m := StandardMaterial3D.new(); m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD; m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_texture = puff_tex; m.albedo_color = Color(1, 0.75, 0.35); m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_texture = glow_tex; m.albedo_color = Color(1, 0.75, 0.35); m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.vertex_color_use_as_albedo = true
 	s.material_override = m
 	add_child(s); s.global_position = p
@@ -1134,7 +1138,7 @@ func _update_gun(dt: float) -> void:
 		var sp: Dictionary = sparks[i]; sp.life += dt
 		var node: Sprite3D = sp.node
 		node.global_position += sp.v * dt; sp.v.y -= 9 * dt
-		node.modulate.a = max(0.0, 1.0 - sp.life / 0.35)
+		var k: float = max(0.0, 1.0 - sp.life / 0.35); node.modulate = Color(1, 0.75, 0.35) * k
 		if sp.life > 0.35: node.queue_free(); sparks.remove_at(i)
 	flash_mark = max(0.0, flash_mark - dt)
 	hud.set_aim(aim_t > 0.5 and state == "walking", flash_mark > 0 and aim_t > 0.5)
@@ -1356,6 +1360,15 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		var lb := InputEventMouseButton.new(); lb.button_index = MOUSE_BUTTON_LEFT; lb.pressed = true; lb.position = ev.position
 		Input.parse_input_event(lb); await _wait_sim(0.3)
 		print("[aimtest] aim_t=", aim_t, " rmb=", rmb_down, " yaw moved=", yaw - y0, " ammo ", a0, "->", ammo)
+		get_tree().quit(); return
+	if sc == "outside":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		front_target = 1.0; set_pos2(1.0, -14.0); john.facing = PI; yaw = 0.3; pitch = 0.32; dist = 4.5
+		await _wait_sim(1.5); await _shot(prefix, "1_culdesac")
+		set_pos2(-6.0, -26.0); john.facing = -PI / 2; yaw = PI / 2 + 0.2; pitch = 0.25
+		await _wait_sim(1.5); await _shot(prefix, "2_circle")
+		set_pos2(-70.0, -27.0); john.facing = -PI / 2; yaw = PI / 2 + 0.6; pitch = 0.2
+		await _wait_sim(1.5); await _shot(prefix, "3_mainstreet")
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return
