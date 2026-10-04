@@ -622,7 +622,9 @@ func _physics_process(dt: float) -> void:
 		vel += lurch; lurch *= exp(-dt * 3.5)
 		john.velocity.x = vel.x; john.velocity.z = vel.z
 		john.velocity.y = -0.5 if john.is_on_floor() else john.velocity.y - 9.8 * dt
+		var intended := Vector3(john.velocity.x, 0, john.velocity.z)   # before the slide eats the part going into the step
 		john.move_and_slide()
+		_step_up(intended, dt)
 		john.pose.walk = lerp(john.pose.walk, 1.0 if ml > 0 else 0.0, 1.0 - exp(-dt * 10.0))
 		john.pose.phase += dt * 8.5 * john.pose.walk * (1.55 if boost_t > 0 else 1.0)
 		var sg := signf(sin(john.pose.phase))
@@ -631,6 +633,25 @@ func _physics_process(dt: float) -> void:
 	else:
 		john.pose.walk = lerp(john.pose.walk, 0.0, 1.0 - exp(-dt * 10.0))
 		if state == "sitting" and tw == null: hud.prompt("Get up out of the chair" if beers == 0 else "Get up for another", true)
+
+## stairs, curbs and the store's floor lip: if a wall stops John, try the same move from up to
+## 35 cm higher; if that's clear, hop up onto it (floor snapping settles him on the step).
+const STEP_HEIGHT := 0.35
+func _step_up(hvel: Vector3, dt: float) -> void:
+	if not john.is_on_wall() or hvel.length() < 0.1: return
+	var motion := hvel * dt
+	var t: Transform3D = john.global_transform
+	if john.test_move(t, Vector3(0, STEP_HEIGHT, 0)): return          # no headroom
+	var up := t.translated(Vector3(0, STEP_HEIGHT, 0))
+	if john.test_move(up, motion): return                             # still blocked: a real wall
+	# find the step top just in front of John's capsule (radius 0.24)
+	var ahead := up.origin + motion + hvel.normalized() * 0.3
+	var q := PhysicsRayQueryParameters3D.create(ahead + Vector3(0, 0.05, 0), ahead - Vector3(0, STEP_HEIGHT + 0.05, 0))
+	q.exclude = [john.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty() or hit.normal.y < 0.7 or hit.position.y <= t.origin.y + 0.02: return
+	john.global_position = Vector3(t.origin.x + motion.x, hit.position.y + 0.01, t.origin.z + motion.z)
+	john.velocity.y = 0.0
 
 func _prompts() -> void:
 	var sp: Array = store.prompt() if (store and not peeping) else []
@@ -1560,6 +1581,28 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		for k in 12:
 			await _wait_sim(0.25)
 			print("[rag] t=%.2f torso %s head %s shinL %s" % [k * 0.25, store.rag.torso.global_position.snapped(Vector3(0.01,0.01,0.01)), store.rag.head.global_position.snapped(Vector3(0.01,0.01,0.01)), store.rag.shinL.global_position.snapped(Vector3(0.01,0.01,0.01))])
+		get_tree().quit(); return
+	if sc == "bugs":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		# 1) drive
+		var near: Vector3 = car.to_world(Vector3(1.6, 0, 0)); set_pos2(near.x, near.z); john.global_position.y = car.global_position.y + 0.1
+		await _wait_sim(0.3); interact(); await _wait_sim(0.3)
+		var p0: Vector3 = car.global_position
+		Input.action_press("move_forward"); await _wait_sim(1.2); Input.action_release("move_forward")
+		print("[bugs] car moved %.2f m, speed %.1f" % [car.global_position.distance_to(p0), car.v])
+		await _wait_sim(2.5); interact(); await _wait_sim(0.3)
+		# 2) porch steps: stand on the lawn in front of the steps, walk up onto the porch
+		var prof := []
+		for k in 20:
+			var z := -9.2 + k * 0.1
+			var q := PhysicsRayQueryParameters3D.create(Vector3(FD_X, 1.5, z), Vector3(FD_X, -1.0, z)); q.exclude = [john.get_rid()]
+			var h := get_world_3d().direct_space_state.intersect_ray(q)
+			prof.append("%.1f:%s" % [z, ("%.2f(%s)" % [h.position.y, h.collider.get_parent().name]) if h else "-"])
+		print("[bugs] profile ", " ".join(prof))
+		set_pos2(FD_X, -9.6); john.global_position.y = -0.4; john.facing = PI; yaw = PI; await _wait_sim(0.5)
+		var y0: float = john.global_position.y
+		Input.action_press("move_forward"); await _wait_sim(2.0); Input.action_release("move_forward")
+		print("[bugs] porch: from y %.2f z %.2f to y %.2f z %.2f" % [y0, -9.6, john.global_position.y, john.global_position.z])
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return

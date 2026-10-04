@@ -74,7 +74,8 @@ func setup(game: Node3D) -> void:
 	if case_node:
 		var gt := case_node.global_transform
 		case_node.get_parent().remove_child(case_node); g.add_child(case_node); case_node.global_transform = gt
-		for b in case_node.find_children("*", "StaticBody3D", true, false): b.queue_free()
+		for b in case_node.find_children("*", "StaticBody3D", true, false):
+			b.get_parent().remove_child(b); b.free()     # gone now, before the trunk copy is made (it was jamming the car)
 		case_node.visible = false
 		# a copy rides in the M1's trunk
 		trunk_case = case_node.duplicate(); trunk_case.visible = false
