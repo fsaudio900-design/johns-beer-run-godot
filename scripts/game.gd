@@ -1449,6 +1449,14 @@ func _shot(prefix: String, name: String) -> void:
 	get_viewport().get_texture().get_image().save_png("%s_%s.png" % [prefix, name])
 	print("[shot] ", name, " state=", state, " pos=", john.global_position, " sit=", john.pose.sit)
 
+func _test_shot(from: Vector3, at: Vector3) -> void:
+	var dir := (at - from).normalized()
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 30.0); q.exclude = [john.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var t0 := Time.get_ticks_usec()
+	store.on_shot(from, dir, hit)
+	print("[shoot] items ", store.prod_items.size(), " chunks ", store.prod_chunks.size(), " xf ", store.prod_xf.origin, " hitpos ", hit.get("position"), " at ", at, " hit=", hit.get("collider"), " debris=", store.debris.size(), " ", (Time.get_ticks_usec() - t0) / 1000.0, " ms")
+
 func _run_scenario(sc: String, prefix: String) -> void:
 	debug_run = true
 	await _wait_sim(0.5)
@@ -1541,6 +1549,34 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		print("[drive] state after exit ", state, " john ", john.global_position)
 		await _shot(prefix, "4_out")
 		get_tree().quit(); return
+	if sc == "shelves":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(-57.4, -49.6); john.global_position.y = -0.3
+		if _debug_args().has("lod"): get_viewport().mesh_lod_threshold = float(_debug_args().lod)
+		var cams := [[Vector3(-52, 1.6, -45.5), Vector3(-52, 0.9, -50)], [Vector3(-56.5, 1.4, -47.5), Vector3(-54.5, 0.9, -48.5)], [Vector3(-48.5, 1.4, -47.0), Vector3(-50.5, 0.9, -48.5)], [Vector3(-53.2, 1.2, -48.5), Vector3(-53.2, 0.9, -51.5)]]
+		for i in cams.size():
+			debug_cam = {pos = cams[i][0], at = cams[i][1]}
+			await _wait_sim(0.2); await _shot(prefix, "shelf%d" % i)
+		# shoot the gondola from camera 2 and the cooler from camera 3
+		debug_cam = {pos = cams[2][0], at = cams[2][1]}
+		await _wait_sim(0.1)
+		for sp in [Vector2(300, 370), Vector2(380, 345), Vector2(560, 330), Vector2(250, 450), Vector2(420, 400), Vector2(640, 380)]:
+			_test_shot(cam.global_position, cam.global_position + cam.project_ray_normal(sp) * 5.0)
+		await _wait_sim(0.05); await _shot(prefix, "shot_a_flying")
+		await _wait_sim(2.0); await _shot(prefix, "shot_b_floor")
+		debug_cam = {pos = cams[3][0], at = cams[3][1]}
+		await _wait_sim(0.1)
+		for sp in [Vector2(950, 520), Vector2(1100, 470), Vector2(1000, 600), Vector2(330, 360), Vector2(700, 280)]:
+			_test_shot(cam.global_position, cam.global_position + cam.project_ray_normal(sp) * 6.0)
+		await _wait_sim(2.0); await _shot(prefix, "shot_c_cooler")
+		debug_cam = {pos = cams[1][0], at = cams[1][1]}; await _wait_sim(0.1)
+		for sp in [Vector2(330, 560), Vector2(470, 600), Vector2(90, 470)]:
+			_test_shot(cam.global_position, cam.global_position + cam.project_ray_normal(sp) * 4.0)
+		await _wait_sim(0.12); await _shot(prefix, "shot_e_boxes_fly")
+		await _wait_sim(2.0); await _shot(prefix, "shot_f_boxes_after")
+		store.reset(); await _wait_sim(0.2)
+		debug_cam = {pos = cams[2][0], at = cams[2][1]}; await _wait_sim(0.1); await _shot(prefix, "shot_d_reset")
+		get_tree().quit(); return
 	if sc == "store":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
 		set_pos2(-57.4, -49.6); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.3
@@ -1609,7 +1645,7 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		await _shot(prefix, "3_falling")
 		await _wait_sim(4.0); await _shot(prefix, "4_ragdoll_pool")
 		debug_cam = {pos = Vector3(-49.0, 1.6, -47.6), at = Vector3(-50.5, 0.6, -50.5)}
-		for i in 3: store._knock_products(Vector3(-50.5, 0.9, -50.0), Vector3(0, 0, 1), Vector3(0, 0, -1))
+		for i in 3: _test_shot(Vector3(-49.0, 1.2, -47.6), Vector3(-50.5 + i * 0.15, 0.7, -50.5))
 		await _wait_sim(1.2); await _shot(prefix, "5_products")
 		get_tree().quit(); return
 	if sc == "ragtest":

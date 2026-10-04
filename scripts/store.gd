@@ -53,6 +53,10 @@ var wounds: Array[Node3D] = []
 var pool: Decal
 var pool_t := 0.0
 var debris: Array[Node3D] = []
+# shelf products: every item on the shelves can be shot off (geometry split by tools/split_products.py)
+var prod_items: Array = []          # {mn, mx: Vector3 (store-local), chunks: Array, gone: bool}
+var prod_chunks := {}               # chunk name -> {mi, orig, arr, idx, tris (id -> PackedInt32Array of tri starts)}
+var prod_xf := Transform3D.IDENTITY # store root, store-local -> world
 var tex_splat: Texture2D = preload("res://assets/fx/blood_splat.png")
 var tex_pool: Texture2D = preload("res://assets/fx/blood_pool.png")
 var tex_wound: Texture2D = preload("res://assets/fx/wound.png")
@@ -85,6 +89,7 @@ func setup(game: Node3D) -> void:
 	drop_mat = StandardMaterial3D.new(); drop_mat.albedo_color = Color(0.42, 0, 0.02); drop_mat.roughness = 0.3
 	wound_mat = StandardMaterial3D.new(); wound_mat.albedo_texture = tex_wound; wound_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	wound_mat.roughness = 0.3; wound_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_load_products()
 	_spawn_clerk()
 
 # ------------------------------------------------------------------ helpers
@@ -131,6 +136,7 @@ func reset() -> void:
 	decals.clear(); wounds.clear()
 	for d in debris: if is_instance_valid(d): d.queue_free()
 	debris.clear()
+	_restore_products()
 	if pool: pool.queue_free(); pool = null
 	_spawn_clerk()
 	g.hud.set_pill("wanted", 0)
@@ -322,7 +328,7 @@ func on_shot(from: Vector3, dir: Vector3, hit: Dictionary) -> bool:
 	if not ch.is_empty():
 		shoot_clerk(ch, from + dir * (ch.t - 0.05), dir); return true
 	if in_store():
-		if hit: _knock_products(hit.position, hit.normal, dir)
+		_shoot_product(from, dir, _see_through_d(from, dir, hit, point_d))
 		if rob.clerk == "idle": hands_up()
 		start_wanted()
 	return false
@@ -417,31 +423,119 @@ func _update_blood(dt: float) -> void:
 		pool.size = Vector3(sz, 0.3, sz)
 
 # ------------------------------------------------------------------ products knocked off the shelves
-const PRODUCT_COLORS := [Color("#d8261d"), Color("#f6c400"), Color("#1d6fd8"), Color("#2fa84f"), Color("#e8e2d0"), Color("#7a3fb0"), Color("#ff7a1a")]
-func _knock_products(p: Vector3, nrm: Vector3, dir: Vector3) -> void:
-	if p.y < FLOOR + 0.25 or p.y > FLOOR + 2.3: return
-	var n := 2 + randi() % 3
-	for i in n:
-		var b := RigidBody3D.new(); b.collision_layer = 1 << 2; b.collision_mask = 1 | (1 << 2)
-		b.mass = 0.3; b.linear_damp = 0.2; b.angular_damp = 0.4
-		var mi := MeshInstance3D.new(); var cs := CollisionShape3D.new()
-		var mat := StandardMaterial3D.new(); mat.albedo_color = PRODUCT_COLORS.pick_random(); mat.roughness = 0.45
-		if randf() < 0.5:
-			var cm := CylinderMesh.new(); cm.top_radius = 0.032; cm.bottom_radius = 0.035; cm.height = 0.2 + randf() * 0.08
-			mi.mesh = cm; var sh := CylinderShape3D.new(); sh.radius = 0.034; sh.height = cm.height; cs.shape = sh
-			mat.metallic = 0.3
-		else:
-			var bm := BoxMesh.new(); bm.size = Vector3(0.16 + randf() * 0.06, 0.22 + randf() * 0.06, 0.05 + randf() * 0.04)
-			mi.mesh = bm; var sh := BoxShape3D.new(); sh.size = bm.size; cs.shape = sh
-		mi.material_override = mat; b.add_child(mi); b.add_child(cs)
-		g.add_child(b)
-		b.global_position = p + nrm * (0.12 + randf() * 0.1) + Vector3((randf() - 0.5) * 0.3, (randf() - 0.5) * 0.2, (randf() - 0.5) * 0.3)
-		b.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
-		b.linear_velocity = (nrm * (1.0 + randf() * 2.0) + dir * (1.0 + randf() * 1.5) + Vector3(0, 1.2 + randf(), 0))
-		b.angular_velocity = Vector3(randf() - 0.5, randf() - 0.5, randf() - 0.5) * 14.0
-		debris.append(b)
+## The item the bullet actually hits is cut out of its shelf mesh and falls as a physics body.
+func _load_products() -> void:
+	var f := FileAccess.open("res://assets/world/fuelstop_products.json", FileAccess.READ)
+	if f == null: push_warning("fuelstop_products.json missing"); return
+	var d = JSON.parse_string(f.get_as_text())
+	if not d is Dictionary: return
+	for mi: MeshInstance3D in g.find_children("Products_baked_s*", "MeshInstance3D", true, false):
+		prod_chunks[String(mi.name)] = {mi = mi, orig = mi.mesh}
+		prod_xf = (mi.get_parent() as Node3D).global_transform
+	for it in d.items:
+		prod_items.append({mn = Vector3(it.mn[0], it.mn[1], it.mn[2]), mx = Vector3(it.mx[0], it.mx[1], it.mx[2]), chunks = it.chunks, gone = false})
+
+func _restore_products() -> void:
+	for c in prod_chunks.values():
+		c.mi.mesh = c.orig
+		for k in ["arr", "idx", "tris"]: c.erase(k)
+	for it in prod_items: it.gone = false
+
+## bullets go through the cooler glass: products behind a transparent surface can still be hit
+func _see_through_d(from: Vector3, dir: Vector3, hit: Dictionary, d: float) -> float:
+	var tries := 0
+	while hit and tries < 3:
+		var mi := (hit.collider as Node).get_parent() as MeshInstance3D
+		if mi == null or mi.mesh == null: break
+		var m := mi.get_active_material(0) as BaseMaterial3D
+		if m == null or m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED: break
+		var q := PhysicsRayQueryParameters3D.create(hit.position + dir * 0.01, from + dir * 30.0)
+		q.exclude = [hit.rid, g.john.get_rid()]
+		hit = g.get_world_3d().direct_space_state.intersect_ray(q)
+		d = from.distance_to(hit.position) if hit else 30.0
+		tries += 1
+	return d
+
+func _shoot_product(from: Vector3, dir: Vector3, max_d: float) -> void:
+	if prod_items.is_empty(): return
+	var inv := prod_xf.affine_inverse()
+	var o: Vector3 = inv * from
+	var dl: Vector3 = (inv.basis * dir).normalized()
+	var rcp := Vector3(1.0 / (dl.x if abs(dl.x) > 1e-6 else 1e-6), 1.0 / (dl.y if abs(dl.y) > 1e-6 else 1e-6), 1.0 / (dl.z if abs(dl.z) > 1e-6 else 1e-6))
+	var best := max_d + 0.03; var bk := -1
+	for k in prod_items.size():
+		var it: Dictionary = prod_items[k]
+		if it.gone: continue
+		var t1: Vector3 = (it.mn - o) * rcp; var t2: Vector3 = (it.mx - o) * rcp
+		var tn: float = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z))
+		var tf: float = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z))
+		if tf < max(tn, 0.0) or tn < 0.0 or tn >= best: continue
+		best = tn; bk = k
+	if bk >= 0: _knock_item(bk, dir)
+
+func _chunk_data(c: Dictionary) -> void:
+	if c.has("arr"): return
+	var arr: Array = (c.orig as Mesh).surface_get_arrays(0)
+	var nv: int = (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if idx.is_empty():
+		idx.resize(nv)
+		for i in nv: idx[i] = i
+	var uv2: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV2]
+	var tris := {}
+	for i in range(0, idx.size(), 3):
+		var q: Vector2 = uv2[idx[i]]
+		var id := int(round(q.x)) + 256 * int(round(q.y))
+		if not tris.has(id): tris[id] = []
+		tris[id].append(i)            # plain Array: Packed arrays inside a Dictionary are copies
+	c.arr = arr; c.idx = idx; c.tris = tris
+
+func _knock_item(k: int, dir: Vector3) -> void:
+	var it: Dictionary = prod_items[k]
+	it.gone = true
+	var ctr: Vector3 = (it.mn + it.mx) * 0.5
+	var dm := ArrayMesh.new()
+	for cname in it.chunks:
+		var c: Dictionary = prod_chunks.get(cname, {})
+		if c.is_empty(): continue
+		_chunk_data(c)
+		var starts: Array = c.tris.get(k, [])
+		if starts.is_empty(): continue
+		var arr: Array = c.arr; var idx: PackedInt32Array = c.idx
+		var V: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]; var Nn: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+		var U: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV] if arr[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+		var C: PackedColorArray = arr[Mesh.ARRAY_COLOR] if arr[Mesh.ARRAY_COLOR] != null else PackedColorArray()
+		var pv := PackedVector3Array(); var pn := PackedVector3Array(); var pu := PackedVector2Array(); var pc := PackedColorArray()
+		for st in starts:
+			for e in 3:
+				var vi: int = idx[st + e]
+				pv.append(V[vi] - ctr); pn.append(Nn[vi])
+				if not U.is_empty(): pu.append(U[vi])
+				if not C.is_empty(): pc.append(C[vi])
+			idx[st + 1] = idx[st]; idx[st + 2] = idx[st]     # collapse the triangle on the shelf
+		var da := []; da.resize(Mesh.ARRAY_MAX)
+		da[Mesh.ARRAY_VERTEX] = pv; da[Mesh.ARRAY_NORMAL] = pn
+		if not pu.is_empty(): da[Mesh.ARRAY_TEX_UV] = pu
+		if not pc.is_empty(): da[Mesh.ARRAY_COLOR] = pc
+		var mat: Material = (c.mi as MeshInstance3D).get_active_material(0)
+		dm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, da); dm.surface_set_material(dm.get_surface_count() - 1, mat)
+		# rebuild the (small) chunk without the item
+		c.idx = idx; arr[Mesh.ARRAY_INDEX] = idx
+		var nm := ArrayMesh.new(); nm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr); nm.surface_set_material(0, mat)
+		(c.mi as MeshInstance3D).mesh = nm
+	if dm.get_surface_count() == 0: return
+	var b := RigidBody3D.new(); b.collision_layer = 1 << 2; b.collision_mask = 1 | (1 << 2)
+	var size: Vector3 = (it.mx - it.mn).max(Vector3(0.02, 0.02, 0.02))
+	b.mass = clamp(size.x * size.y * size.z * 600.0, 0.05, 1.5); b.linear_damp = 0.15; b.angular_damp = 0.5
+	var mi := MeshInstance3D.new(); mi.mesh = dm; b.add_child(mi)
+	var cs := CollisionShape3D.new(); var sh := BoxShape3D.new(); sh.size = size; cs.shape = sh; b.add_child(cs)
+	g.add_child(b)
+	b.global_transform = Transform3D(prod_xf.basis, prod_xf * ctr)
+	b.linear_velocity = dir * (2.0 + randf() * 1.5) + Vector3(0, 0.6 + randf() * 0.8, 0)
+	b.angular_velocity = Vector3(randf() - 0.5, randf() - 0.5, randf() - 0.5) * 12.0
+	debris.append(b)
 	Sfx.play_var("clink", 3)
-	while debris.size() > 60:
+	while debris.size() > 150:
 		var d0: Node3D = debris.pop_front()
 		if is_instance_valid(d0): d0.queue_free()
 
