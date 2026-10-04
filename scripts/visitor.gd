@@ -89,12 +89,55 @@ func pose(dt: float) -> void:
 	if flinch > 0:
 		if spine: spine.rotation.x -= 0.35 * flinch
 		hx -= 0.25 * flinch
+	aim_fingers = a
 	if head: head.rotation = Vector3(hx, hy, 0)
 	_set_rot("shL", Vector3(aLx, 0, aLz)); _rx("elL", eLx)
 	_set_rot("shR", Vector3(aRx, 0, aRz)); _rx("elR", eRx)
 	if k < 0.001:
 		for i in 4: _rx("fR%d" % i, 0.25)
 	for i in 4: _rx("fL%d" % i, lerp(0.25, 0.0, v))
+	# the pistol: fingers wrapped round the grip, both hands meeting on it in front of his chest
+	if aim_fingers > 0.01:
+		for i in 4:
+			_rx("fR%d" % i, lerp(0.25, 1.45, aim_fingers)); _rx("fL%d" % i, lerp(0.25, 1.1, aim_fingers))
+		_aim_ik(aim_fingers)
+
+var aim_fingers := 0.0
+
+## world-space point between his hands where the pistol grip sits, and the aim direction
+func aim_dir() -> Vector3:
+	var f := Vector3(sin(global_rotation.y), 0, cos(global_rotation.y))
+	return (f * cos(aim_pitch) + Vector3.UP * sin(aim_pitch)).normalized()
+
+func grip_point() -> Vector3:
+	var sL: Vector3 = (J.shL as Node3D).global_position; var sR: Vector3 = (J.shR as Node3D).global_position
+	return (sL + sR) * 0.5 + aim_dir() * 0.56 + Vector3(0, -0.07, 0)
+
+func _aim_ik(w: float) -> void:
+	if not (J.has("shR") and J.has("elR") and J.has("wrR") and J.has("shL")): return
+	var right := ((J.shR as Node3D).global_position - (J.shL as Node3D).global_position).normalized()
+	var D := aim_dir()
+	var H := grip_point()
+	var down := Vector3.DOWN
+	_two_bone(J.shR, J.elR, J.wrR, H + right * 0.015, w, (J.shR as Node3D).global_position + down + right * 0.6 - D * 0.2)
+	_two_bone(J.shL, J.elL, J.wrL, H - right * 0.035 - D * 0.02 + down * 0.025, w, (J.shL as Node3D).global_position + down - right * 0.6 - D * 0.2)
+
+## two-bone arm IK on the procedural joints (the skinned model copies the result)
+func _two_bone(sh: Node3D, el: Node3D, wr: Node3D, T: Vector3, w: float, pole: Vector3) -> void:
+	var S := sh.global_position
+	T = wr.global_position.lerp(T, w)
+	var a := S.distance_to(el.global_position); var b := el.global_position.distance_to(wr.global_position)
+	var dv := T - S
+	var d: float = clamp(dv.length(), 0.02, a + b - 0.002)
+	var dir := dv.normalized()
+	var x := (a * a - b * b + d * d) / (2.0 * d)
+	var h := sqrt(max(a * a - x * x, 0.0))
+	var pv := pole - S; pv = pv - dir * pv.dot(dir)
+	if pv.length_squared() < 1e-6: pv = Vector3.DOWN
+	var E := S + dir * x + pv.normalized() * h
+	sh.global_basis = Basis(SkinDriver._arc((el.global_position - S).normalized(), (E - S).normalized())) * sh.global_basis
+	var Ec := el.global_position
+	el.global_basis = Basis(SkinDriver._arc((wr.global_position - Ec).normalized(), (S + dir * d - Ec).normalized())) * el.global_basis
 
 func _rx(n: String, a: float) -> void:
 	var j := _j(n)

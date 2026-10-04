@@ -39,6 +39,7 @@ var hips_rest_joint := Vector3.ZERO  # skeleton space
 var rag := {}                        # part -> [body, Transform3D body->joint]
 var rag_hips := Transform3D()
 var bone_ix := {}                    # clean Mixamo name -> bone idx
+var after_update: Callable           # e.g. put the officer's pistol in the (now posed) hand
 
 static func _clean(n: String) -> String:
 	n = n.get_slice(":", n.get_slice_count(":") - 1)
@@ -165,3 +166,4 @@ func update() -> void:
 		var p := skel.get_bone_parent(hips_bone)
 		var pgx: Transform3D = skel.get_bone_global_pose(p) if p >= 0 else Transform3D.IDENTITY
 		skel.set_bone_pose_position(hips_bone, pgx.affine_inverse() * target)
+	if after_update.is_valid(): after_update.call()

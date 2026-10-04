@@ -201,7 +201,11 @@ func _drive(c: Dictionary, dt: float) -> void:
 			if d_end < 14: vmax = max(2.0, d_end * 1.1)
 			if c.mode == "return" and d_end < 2.0: c.mode = "parked"; c.v = 0.0
 			if c.mode == "search" and d_end < 4.0: vmax = 0.0
-			if c.mode == "pursue" and c.officer != null: vmax = 0.0       # parked while the officer is out
+	# nobody behind the wheel: the officer is out on foot (or down) -> the cruiser stays where it stopped
+	if c.officer != null or c.crew <= 0:
+		c.rev = 0.0; c.stuck = 0.0; c.steer = lerp(c.steer, 0.0, 1.0 - exp(-dt * 4))
+		c.v = move_toward(c.v, 0.0, 22.0 * dt)
+		goal = null
 	if c.mode == "parked":
 		c.v = lerp(c.v, 0.0, 1.0 - exp(-dt * 4)); c.h = lerp_angle(c.h, c.home.h, 1.0 - exp(-dt * 1.5))
 	elif goal != null:
@@ -313,6 +317,7 @@ func _arrest(c: Dictionary, o) -> void:
 	if g.state == "driving": g.car.v = 0.0; g.exit_car()
 	g.set_state("busy"); g.hud.prompt(""); g.rmb_down = false
 	var rec: Dictionary
+	if o == null and c.officer != null: o = c.officer       # that cruiser's officer is already out on foot
 	if o != null: rec = o
 	else:
 		_deploy(c); rec = c.officer
@@ -397,16 +402,28 @@ func _sees_car(from: Vector3) -> bool:
 	return g.get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 func _update_officer_gun(o: Dictionary) -> void:
+	var node: Node3D = o.node
+	# the pistol is placed once the skinned body has been posed this frame (its real hand bone)
+	if node.skin and not node.skin.after_update.is_valid():
+		node.skin.after_update = func(): _place_officer_gun(o)
+	if node.skin == null: _place_officer_gun(o)
+
+func _place_officer_gun(o: Dictionary) -> void:
+	if not is_instance_valid(o.gun) or not is_instance_valid(o.node): return
 	var gun: Node3D = o.gun
-	if not is_instance_valid(gun): return
 	var node: Node3D = o.node
 	gun.visible = node.aim_w > 0.35
 	if not gun.visible: return
-	var J: Dictionary = node.J
-	var hand: Vector3 = (J.wrR as Node3D).global_position
-	var fwd := Vector3(sin(node.rotation.y), 0, cos(node.rotation.y))
-	var dir := (fwd * cos(node.aim_pitch) + Vector3.UP * sin(node.aim_pitch)).normalized()
-	gun.global_transform = Transform3D(Basis.looking_at(-dir, Vector3.UP), hand + dir * 0.07 + Vector3(0, 0.02, 0))
+	var dir: Vector3 = node.aim_dir()
+	var palm: Vector3
+	if node.skin:
+		var hand: Vector3 = node.skin.bone_world("RightHand"); var mid: Vector3 = node.skin.bone_world("RightHandMiddle1")
+		var idx: Vector3 = node.skin.bone_world("RightHandIndex1"); var pk: Vector3 = node.skin.bone_world("RightHandPinky1")
+		palm = hand.lerp((mid + idx + pk) / 3.0, 0.55)
+	else:
+		palm = (node.J.wrR as Node3D).global_position + dir * 0.05
+	# grip in the palm, barrel along the aim, slide up
+	gun.global_transform = Transform3D(Basis.looking_at(-dir, Vector3.UP), palm + Vector3(0, -0.035, 0) - dir * 0.01)
 
 func _officer_fire(o: Dictionary) -> void:
 	var gun: Node3D = o.gun
@@ -496,7 +513,7 @@ func _kill_officer(o: Dictionary, part: String, impulse: Vector3) -> void:
 	var node: Node3D = o.node
 	var holder := Node3D.new(); holder.name = "FallenOfficer"; g.add_child(holder)
 	var bodies := Ragdoll.build(holder, node.J, part, impulse)
-	if node.skin: node.skin.follow_ragdoll(bodies)
+	if node.skin: node.skin.follow_ragdoll(bodies); node.skin.after_update = Callable()
 	if is_instance_valid(o.gun): o.gun.queue_free()
 	officers.erase(o)
 	o.car.officer = null; o.car.crew -= 1
@@ -537,6 +554,9 @@ func update(dt: float) -> void:
 			search_pt = _closest(last_known + Vector3(cos(a) * r, 0, sin(a) * r), FOOT_LAYER)
 	# dispatch / recall
 	for c in cars:
+		if c.crew <= 0:
+			if c.siren.playing: c.siren.stop()
+			continue
 		if W and (c.mode == "parked" or c.mode == "patrol" or c.mode == "return"):
 			c.mode = "pursue"; c.path = PackedVector3Array(); c.siren.play()
 			if last_known == Vector3.ZERO: last_known = Vector3(g.store.STX, -0.45, g.store.STZ + 4.0); seen_t = LOST_AFTER   # the crime scene

@@ -1791,6 +1791,18 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		var fdir := Vector3(sin(john.facing), 0, cos(john.facing))
 		debug_cam = {pos = jp + fdir * 1.6 + side * 0.9 + Vector3(0, 1.5, 0), at = jp + Vector3(0, 1.3, 0)}
 		await _wait_sim(0.05); await _shot(prefix, "1b_hands_front")
+		var offn: Node3D = police.arrest.o.node
+		var of := Vector3(sin(offn.rotation.y), 0, cos(offn.rotation.y)); var orr := Vector3(-cos(offn.rotation.y), 0, sin(offn.rotation.y))
+		debug_cam = {pos = offn.global_position + of * 0.9 + orr * 0.9 + Vector3(0, 1.55, 0), at = offn.global_position + of * 0.4 + Vector3(0, 1.3, 0)}
+		await _wait_sim(0.05); await _shot(prefix, "1c_officer_grip")
+		debug_cam = {pos = offn.global_position + orr * 1.6 + Vector3(0, 1.4, 0), at = offn.global_position + of * 0.3 + Vector3(0, 1.25, 0)}
+		await _wait_sim(0.05); await _shot(prefix, "1d_officer_side")
+		var cps := []
+		for c in police.cars: cps.append(c.body.global_position)
+		await _wait_sim(1.5)
+		for i in police.cars.size():
+			var c: Dictionary = police.cars[i]
+			print("[cars] %d mode=%s officer=%s moved=%.2f v=%.2f" % [i, c.mode, c.officer != null, (c.body.global_position as Vector3).distance_to(cps[i]), c.v])
 		debug_cam = {pos = jp + side * 4.5 + Vector3(0, 1.7, 0), at = jp + fdir * 1.2 + Vector3(0, 1.0, 0)}
 		print("[arrest] can_resist=", police.can_resist(), " state=", state)
 		if mode == "cuff":
@@ -1830,7 +1842,12 @@ func _run_scenario(sc: String, prefix: String) -> void:
 			var hit_any: bool = police.on_shot(from, (tgt - from).normalized(), {})
 			print("[fight] John fires: hit=", hit_any, " officers left=", police.officers.size())
 			await _wait_sim(0.3)
+		var cp2 := []
+		for c in police.cars: cp2.append(c.body.global_position)
 		await _wait_sim(2.5)
+		for i in police.cars.size():
+			var c: Dictionary = police.cars[i]
+			print("[cars] after kills %d crew=%d officer=%s moved=%.2f" % [i, c.crew, c.officer != null, (c.body.global_position as Vector3).distance_to(cp2[i])])
 		var bp: Vector3 = (police.dead[0].bodies.torso as Node3D).global_position if police.dead.size() else jp
 		debug_cam = {pos = bp + Vector3(2.2, 1.9, 1.6), at = bp}
 		await _wait_sim(0.1); await _shot(prefix, "4_officer_down")
