@@ -129,11 +129,11 @@ func _pill(parent: Control, title: String, bg: Color, fg: Color) -> Dictionary:
 	var p := PanelContainer.new(); p.add_theme_stylebox_override("panel", sb(bg, 999, Color(0, 0, 0, 0), 0, Vector4(11, 5, 11, 5)))
 	p.size_flags_horizontal = Control.SIZE_SHRINK_END; p.visible = false
 	var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 5); p.add_child(row)
-	row.add_child(_label(title, f_body_bold, 12, fg, Color(0, 0, 0, 0)))
+	var tl := _label(title, f_body_bold, 12, fg, Color(0, 0, 0, 0)); row.add_child(tl)
 	var n := _label("0", f_body_bold, 14, fg, Color(0, 0, 0, 0)); row.add_child(n)
 	row.add_child(_label("s", f_body_bold, 12, fg, Color(0, 0, 0, 0)))
 	parent.add_child(p)
-	return {box = p, n = n}
+	return {box = p, n = n, t = tl}
 
 func _build_bottom() -> void:
 	sub = RichTextLabel.new(); sub.bbcode_enabled = true; sub.fit_content = true; sub.scroll_active = false
@@ -249,3 +249,7 @@ func set_aim(xh: bool, hit: bool) -> void:
 func set_speed(mph: int) -> void:
 	speedo.visible = mph >= 0
 	if mph >= 0: mph_lbl.text = str(mph)
+
+func set_pill_title(name: String, title: String) -> void:
+	var p: Dictionary = pills[name]
+	if p.t.text != title: p.t.text = title

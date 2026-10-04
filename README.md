@@ -1,4 +1,4 @@
-# John's Beer Run: Godot 4.3 port (v2.7, stage 6)
+# John's Beer Run: Godot 4.3 port (v2.8, stage 7)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 
@@ -53,6 +53,16 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
   - **Shooting Dale:** hits react by body part. An arm hit spins him, a leg hit drops him to one knee, body hits make him hunch and bleed. Three body hits or one headshot kills him.
   - **His death:** he goes into a real physics ragdoll and a blood pool spreads under him. Then John can walk behind the counter and rob the till himself.
   - **Stray bullets** in the store knock products off the shelves, and they bounce and roll on the floor.
+- **The Pine Hollow police (stage 7):**
+  - **Patrols:** one cruiser patrols Main Street and the cul-de-sac. Two wait in the station lot.
+  - **Pathfinding:** when John is Wanted, all three light up and find their own way to him around houses, poles and buildings.
+  - **Officers on foot:** near John, an officer jumps out and chases him on foot. Officers can follow John into the Fuel Stop.
+  - **Line of sight:** the HUD shows SPOTTED while a cop can see John and SEARCHING when they've lost him. The Wanted clock only runs down while they can't see him.
+  - **Searching:** they drive to where he was last seen and search the area, with roof spotlights sweeping the yards.
+  - **Hiding in the cabin:** with the door shut, they surround the porch, call him out, and come in after about 6 seconds.
+  - **In the car:** if a cruiser boxes in the M1 while it's going slowly, John is pulled out and arrested.
+  - **Getting caught** means BUSTED.
+  - **3D sirens:** every cruiser has its own siren that comes from its direction and doppler-shifts as it passes. The red and blue lights wash over the houses.
 - **Character models:** the visitor, Dale the clerk and the officer are exported from the web game (`assets/chars`). The clerk and officer are already in place for stages 6 and 7.
 
 ## Controls
@@ -86,8 +96,7 @@ A few things are still set up when the game starts and only show up when you pre
 - `tools/glb_jpeg.py`: shrinks the textures inside the world files.
 
 ## Test run
-`godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`, `--scenario=drive`, `--scenario=outside`) plays through the actions and saves screenshots.
+`godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`, `--scenario=drive`, `--scenario=outside`, `--scenario=store`, `--scenario=rob`, `--scenario=police`, `--scenario=hide`) plays through the actions and saves screenshots.
 
 ## Next stages
-7. The police.
 8. The pause menu and a Windows export.

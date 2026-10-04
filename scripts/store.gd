@@ -532,9 +532,7 @@ func update(dt: float) -> void:
 	if rob.wanted > 0 and g.state != "end" and g.state != "title":
 		rob.wanted = max(0.0, rob.wanted - dt)
 		g.hud.set_pill("wanted", rob.wanted)
-		Sfx.set_loop("siren_loop", clamp(1.0 - rob.wanted / 60.0, 0.0, 1.0), dt, 2.0)
 		if rob.wanted <= 0:
 			say(["Think I lost 'em.", "Nobody saw nothing.", "Home free."].pick_random(), 2.6)
 	else:
 		g.hud.set_pill("wanted", 0)
-		Sfx.set_loop("siren_loop", 0.0, dt, 2.0)

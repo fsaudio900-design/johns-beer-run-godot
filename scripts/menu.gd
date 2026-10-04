@@ -7,7 +7,7 @@ signal again_pressed
 signal menu_pressed
 signal retry_pressed
 
-const VERSION := "v2.7"
+const VERSION := "v2.8"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")
@@ -180,6 +180,7 @@ func _build_card() -> void:
 
 var failed_root: Control
 var failed_why: Label
+var failed_title: Label
 func _build_failed() -> void:
 	failed_root = Control.new(); failed_root.set_anchors_preset(Control.PRESET_FULL_RECT); add_child(failed_root)
 	var bg := ColorRect.new(); bg.color = Color(0, 0, 0, 0.78); bg.set_anchors_preset(Control.PRESET_FULL_RECT); failed_root.add_child(bg)
@@ -188,7 +189,7 @@ func _build_failed() -> void:
 	s.border_width_top = 2; s.border_width_bottom = 2; s.content_margin_top = 28; s.content_margin_bottom = 28; s.content_margin_left = 60; s.content_margin_right = 60
 	band.add_theme_stylebox_override("panel", s); band.custom_minimum_size = Vector2(1400, 0); cc.add_child(band)
 	var v := VBoxContainer.new(); v.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_theme_constant_override("separation", 14); band.add_child(v)
-	var mf := _l("MISSION FAILED", f_display, 92, Color("#d91f1f")); mf.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var mf := _l("MISSION FAILED", f_display, 92, Color("#d91f1f")); mf.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; failed_title = mf
 	mf.add_theme_color_override("font_shadow_color", Color("#3a0000")); mf.add_theme_constant_override("shadow_offset_y", 4); v.add_child(mf)
 	failed_why = _l("John shot the TV. Now what's he gonna watch?", f_body, 16, INK); failed_why.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(failed_why)
 	var row := HBoxContainer.new(); row.alignment = BoxContainer.ALIGNMENT_CENTER; row.add_theme_constant_override("separation", 14); v.add_child(row)
@@ -197,9 +198,9 @@ func _build_failed() -> void:
 	var mm := Button.new(); mm.text = "Main menu"; mm.add_theme_font_override("font", f_bold); mm.pressed.connect(func(): menu_pressed.emit()); row.add_child(mm)
 	failed_root.visible = false
 
-func show_failed(why: String) -> void:
+func show_failed(why: String, title := "MISSION FAILED") -> void:
 	visible = true; title_root.visible = false; card_root.visible = false; failed_root.visible = true
-	failed_why.text = why
+	failed_why.text = why; failed_title.text = title
 
 func _stat(big: String, small: String) -> Control:
 	var p := PanelContainer.new()

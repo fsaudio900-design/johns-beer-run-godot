@@ -154,6 +154,7 @@ var car: CharacterBody3D
 var handbrake := false
 # ---- stage 6: the Fuel Stop ----
 var store: Node
+var police: Node
 var amb_base: Color
 var amb_energy: float
 var loaded := false
@@ -170,6 +171,8 @@ func _ready() -> void:
 	car.crashed.connect(func(k): Sfx.play("crash", linear_to_db(0.35 + 0.65 * k)))
 	store = Node.new(); store.set_script(load("res://scripts/store.gd")); store.name = "FuelStop"; add_child(store)
 	store.setup(self)
+	police = Node.new(); police.set_script(load("res://scripts/police.gd")); police.name = "Police"; add_child(police)
+	police.setup(self)
 	visitor = get_node_or_null("Visitor")
 	if visitor == null:
 		visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"; add_child(visitor)
@@ -317,6 +320,7 @@ func reset() -> void:
 	if car: car.park(); handbrake = false
 	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false; hud.set_speed(-1)
 	if store: store.reset()
+	if police: police.reset()
 	gun_reset()
 	beers = 0; minutes = 23 * 60 + 12; has_beer = false; steps = 0; stock = STOCK_START; show_stock()
 	for c in floor_cans: c.queue_free()
@@ -601,6 +605,7 @@ func _input(e: InputEvent) -> void:
 func _physics_process(dt: float) -> void:
 	if not loaded: return
 	_update_car(dt)
+	if police: police.update(dt)
 	if state == "walking":
 		var ix := 0.0 if peeping else Input.get_axis("move_left", "move_right"); var iz := 0.0 if peeping else Input.get_axis("move_back", "move_forward")
 		var fx := -sin(yaw); var fz := -cos(yaw); var rx := cos(yaw); var rz := -sin(yaw)
@@ -1252,10 +1257,10 @@ func shoot_tv(p: Vector3) -> void:
 			Sfx.play("zap"))
 	mission_failed("John shot the TV. Now what's he gonna watch?")
 
-func mission_failed(why: String) -> void:
+func mission_failed(why: String, title := "MISSION FAILED") -> void:
 	set_state("end"); hud.prompt(""); rmb_down = false
 	get_tree().create_timer(1.6).timeout.connect(func():
-		_capture(false); menu.show_failed(why); Sfx.play("fail"))
+		_capture(false); menu.show_failed(why, title); Sfx.play("fail"))
 
 # ---- the bathroom mirror
 const MIRROR_W := 0.52
@@ -1604,6 +1609,35 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		var y0: float = john.global_position.y
 		Input.action_press("move_forward"); await _wait_sim(2.0); Input.action_release("move_forward")
 		print("[bugs] porch: from y %.2f z %.2f to y %.2f z %.2f" % [y0, -9.6, john.global_position.y, john.global_position.z])
+		get_tree().quit(); return
+	if sc == "police":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		while police.nav_ready < 2: await _wait_sim(0.5)
+		# rob the store, then stand out front on Main Street
+		set_pos2(-47.4, -46.9); john.global_position.y = -0.3; store.hands_up(); await _wait_sim(0.5)
+		set_pos2(-30.0, -29.0); john.global_position.y = -0.4
+		for k in 24:
+			await _wait_sim(1.0)
+			var cs := []
+			for c in police.cars: cs.append("%s %s v%.1f%s" % [c.mode, Vector2(c.body.global_position.x, c.body.global_position.z).snapped(Vector2(0.1, 0.1)), c.v, " +off" if c.officer else ""])
+			print("[police] t=%d seen=%.1f state=%s %s" % [k, police.seen_t, state, " | ".join(cs)])
+			if k == 1: await _shot(prefix, "1_cruisers")
+			if state == "end" or state == "busy": break
+		await _wait_sim(1.0); await _shot(prefix, "2_arrest")
+		await _wait_sim(4.0); await _shot(prefix, "3_busted")
+		get_tree().quit(); return
+	if sc == "hide":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		while police.nav_ready < 2: await _wait_sim(0.5)
+		set_pos2(-47.4, -46.9); john.global_position.y = -0.3; store.hands_up(); await _wait_sim(0.3)
+		set_pos2(-3.0, 11.0); john.global_position.y = -0.4
+		for k in 40:
+			await _wait_sim(1.0)
+			if k % 3 == 0:
+				var cs := []
+				for c in police.cars: cs.append("%s %s%s" % [c.mode, Vector2(c.body.global_position.x, c.body.global_position.z).snapped(Vector2(1, 1)), " +off(%s)" % c.officer.mode if c.officer else ""])
+				print("[hide] t=%d seen=%.1f wanted=%.0f %s | %s" % [k, police.seen_t, store.rob.wanted, state, " | ".join(cs)])
+			if state != "walking": break
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return
