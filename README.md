@@ -1,4 +1,4 @@
-# John's Beer Run: Godot 4.3 port (v2.6, stage 5)
+# John's Beer Run: Godot 4.3 port (v2.7, stage 6)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 
@@ -11,7 +11,7 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
   - Each beer adds 22 minutes to the clock.
   - At five beers John passes out, with snoring and floating Zzz.
 - **The fridge:** the door swings open, the light comes on, John reaches in and takes a can. The can count drops as he drinks.
-  - It starts with 6 beers until the Fuel Stop run is ported.
+  - It starts empty. Buy a case at the Fuel Stop.
 - **The kitchen table:** three lines. Doing one makes John "wired" for 30 seconds: he moves faster, you hear a heartbeat and the screen gets the high effect.
 - **The bong:** lighter, flame, bubbles, smoke and a cough. About five seconds later the trip starts: flying rainbow cats, the kaleidoscope effect and a drone sound.
 - **Getting drunk:** the screen wobbles, doubles and blurs, the vignette closes in, and John's walk sways and lurches more with every beer.
@@ -44,6 +44,15 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
   - Crashes thump, shake the camera and bounce the car back. The visitor is solid to the car and still can't be hurt.
   - Headlights come on when you get in, and the brake lights glow when braking. The engine note revs through 4 gears.
   - The chase camera pulls back and widens with speed, and there's a speedometer on the HUD.
+- **The Fuel Stop (stage 6):**
+  - **Money:** John starts with $500.
+  - **Dale the clerk:** greets John and keeps an eye on him.
+  - **Buying beer:** grab a case of Lumberjack from the stack in the back and pay at the register ($18.99). Dale won't let you walk out without paying.
+  - **Getting it home:** carry it home in both arms, or put it in the M1's trunk (E at the back of the car, the boot lid opens). Then stock the fridge for 12 more beers.
+  - **The robbery:** aim the Glock at Dale and his hands go up. E at the register demands the cash ($380–720). Any gunfire in the store spooks him, and a 90-second Wanted timer starts with a siren building in the distance.
+  - **Shooting Dale:** hits react by body part. An arm hit spins him, a leg hit drops him to one knee, body hits make him hunch and bleed. Three body hits or one headshot kills him.
+  - **His death:** he goes into a real physics ragdoll and a blood pool spreads under him. Then John can walk behind the counter and rob the till himself.
+  - **Stray bullets** in the store knock products off the shelves, and they bounce and roll on the floor.
 - **Character models:** the visitor, Dale the clerk and the officer are exported from the web game (`assets/chars`). The clerk and officer are already in place for stages 6 and 7.
 
 ## Controls
@@ -80,6 +89,5 @@ A few things are still set up when the game starts and only show up when you pre
 `godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`, `--scenario=drive`, `--scenario=outside`) plays through the actions and saves screenshots.
 
 ## Next stages
-6. The Fuel Stop: the clerk, buying beer, money, the trunk, stocking the fridge and the robbery.
 7. The police.
 8. The pause menu and a Windows export.

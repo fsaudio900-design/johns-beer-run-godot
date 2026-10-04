@@ -7,7 +7,7 @@ signal again_pressed
 signal menu_pressed
 signal retry_pressed
 
-const VERSION := "v2.6"
+const VERSION := "v2.7"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")

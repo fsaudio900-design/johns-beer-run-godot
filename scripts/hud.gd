@@ -99,6 +99,7 @@ func _build_top() -> void:
 	# status pills
 	pills.boost = _pill(right, "WIRED", Color("#e8f3ff"), Color("#0d1a2a"))
 	pills.trip = _pill(right, "TRIPPING", Color("#ff9ad8"), Color("#120a1e"))
+	pills.wanted = _pill(right, "WANTED", Color("#2a0606"), Color("#ffd7d0"))
 	speedo = PanelContainer.new(); speedo.add_theme_stylebox_override("panel", sb(Color("#e8f3ff"), 999, Color(0, 0, 0, 0), 0, Vector4(11, 5, 11, 5)))
 	speedo.size_flags_horizontal = Control.SIZE_SHRINK_END; speedo.visible = false
 	var srow := HBoxContainer.new(); srow.add_theme_constant_override("separation", 5); speedo.add_child(srow)
@@ -226,6 +227,13 @@ func _process(dt: float) -> void:
 		sub_t -= dt
 	else:
 		sub.modulate.a = move_toward(sub.modulate.a, 0.0, dt / 0.4)
+	# wanted pill: pulse red / blue
+	var wp: PanelContainer = pills.wanted.box
+	if wp.visible:
+		var ws: StyleBoxFlat = wp.get_theme_stylebox("panel")
+		var k := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * 7.0)
+		ws.set_border_width_all(1); ws.border_color = Color(1, 0.19, 0.19).lerp(Color(0.29, 0.48, 1), k)
+		ws.shadow_color = ws.border_color * Color(1, 1, 1, 0.6); ws.shadow_size = 6
 	# trip pill: cycle the rainbow
 	var tp: PanelContainer = pills.trip.box
 	if tp.visible:

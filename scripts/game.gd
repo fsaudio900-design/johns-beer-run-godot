@@ -16,7 +16,7 @@ const MAX_BEERS := 5
 const LINE_LEN := 0.22
 const BONG_H := 0.47
 const BOWL_LOCAL := Vector3(0.127, 0.225, 0)
-const STOCK_START := 6       # fridge starts stocked until the Fuel Stop run is ported (stage 6)
+const STOCK_START := 0       # the fridge starts empty: buy a case at the Fuel Stop
 const WALK_SPEED := 2.1
 
 const LINES := {
@@ -152,6 +152,8 @@ var hole_mat: StandardMaterial3D
 # ---- stage 5: driving the M1 ----
 var car: CharacterBody3D
 var handbrake := false
+# ---- stage 6: the Fuel Stop ----
+var store: Node
 var amb_base: Color
 var amb_energy: float
 var loaded := false
@@ -166,6 +168,8 @@ func _ready() -> void:
 	car = get_node_or_null("M1")
 	if car == null: car = CharacterBody3D.new(); car.set_script(load("res://scripts/car.gd")); car.name = "M1"; add_child(car)
 	car.crashed.connect(func(k): Sfx.play("crash", linear_to_db(0.35 + 0.65 * k)))
+	store = Node.new(); store.set_script(load("res://scripts/store.gd")); store.name = "FuelStop"; add_child(store)
+	store.setup(self)
 	visitor = get_node_or_null("Visitor")
 	if visitor == null:
 		visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"; add_child(visitor)
@@ -312,6 +316,7 @@ func reset() -> void:
 	visitor_reset()
 	if car: car.park(); handbrake = false
 	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false; hud.set_speed(-1)
+	if store: store.reset()
 	gun_reset()
 	beers = 0; minutes = 23 * 60 + 12; has_beer = false; steps = 0; stock = STOCK_START; show_stock()
 	for c in floor_cans: c.queue_free()
@@ -355,6 +360,7 @@ func interact() -> void:
 	if state == "driving": exit_car(); return
 	if state == "sitting" and tw == null: stand_up(); return
 	if state != "walking": return
+	if store and store.interact(): return
 	if near_car(): enter_car(); return
 	if near_front():
 		front_target = 0.0 if front_target > 0 else 1.0
@@ -627,7 +633,9 @@ func _physics_process(dt: float) -> void:
 		if state == "sitting" and tw == null: hud.prompt("Get up out of the chair" if beers == 0 else "Get up for another", true)
 
 func _prompts() -> void:
+	var sp: Array = store.prompt() if (store and not peeping) else []
 	if peeping: hud.prompt("Open the door")
+	elif not sp.is_empty(): hud.prompt(sp[0], sp[1])
 	elif near_car(): hud.prompt("Get in the car")
 	elif near_front():
 		var inside := not is_outside()
@@ -658,6 +666,7 @@ func _process(dt: float) -> void:
 
 	# ---- John's pose + held props
 	john.grip_w = 1.0 if armed and not gun_hidden else 0.0
+	if store: store.update(dt)
 	john.apply_pose(clock_t, float(beers) / MAX_BEERS)
 	_update_gun(dt)
 	_update_props(dt)
@@ -746,7 +755,9 @@ func _process(dt: float) -> void:
 	hud.set_pill("boost", boost_t)
 	fade = move_toward(fade, fade_target, dt / 2.5)
 
-	_update_camera(dt)
+	if debug_cam.is_empty(): _update_camera(dt)
+	else:
+		cam.global_position = debug_cam.pos; cam.look_at(debug_cam.at); cam.fov = 60
 	var m: ShaderMaterial = post_rect.material
 	m.set_shader_parameter("u_drunk", drunk_vis * (0.85 + 0.15 * sin(clock_t * 1.3)))
 	m.set_shader_parameter("u_high", high_vis)
@@ -885,6 +896,7 @@ func _update_camera(dt: float) -> void:
 	else:
 		want_pos = Vector3(clamp(want_pos.x, -6.45, 6.45), clamp(want_pos.y, 0.4, 3.15), clamp(want_pos.z, -4.45, 4.45))
 	cam.global_position = cam.global_position.lerp(want_pos, 1.0 - exp(-dt * 6))
+	john.model.visible = state != "driving" and cam.global_position.distance_to(head) > 0.55
 	cam_target = cam_target.lerp(tgt, 1.0 - exp(-dt * 8))
 	if cam.global_position.distance_to(cam_target) > 0.01:
 		cam.look_at(cam_target)
@@ -1107,7 +1119,10 @@ func fire() -> void:
 	_tracer(muzzle, aim_point)
 	if debug_run: print("[fire] muzzle·aim=", gun_rig.global_transform.basis.z.normalized().dot((aim_point - muzzle).normalized()), " up=", gun_rig.global_transform.basis.y, " hit=", aim_hit.get("collider"), " at ", aim_hit.get("position"))
 	pitch = clamp(pitch - 0.03, -0.45, 1.0); yaw += (randf() - 0.5) * 0.012
-	if aim_hit:
+	var cam_dir := -cam.global_transform.basis.z
+	if store and store.on_shot(cam.global_position, cam_dir, aim_hit):
+		flash_mark = 0.15
+	elif aim_hit:
 		var nrm: Vector3 = aim_hit.normal
 		if _is_mirror(aim_hit.collider) and not mirror_broken:
 			shatter_mirror(aim_hit.position)
@@ -1354,6 +1369,7 @@ func _update_car(dt: float) -> void:
 # ------------------------------------------------------------------ test driver
 ## godot -- --scenario=tour --shots=/tmp/x   walks through the cabin actions and saves frames
 var debug_run := false
+var debug_cam := {}
 func _debug_args() -> Dictionary:
 	var a := {}
 	for s in OS.get_cmdline_user_args():
@@ -1462,6 +1478,88 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		interact(); await _wait_sim(0.5)
 		print("[drive] state after exit ", state, " john ", john.global_position)
 		await _shot(prefix, "4_out")
+		get_tree().quit(); return
+	if sc == "store":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(-57.4, -49.6); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.3
+		await _wait_sim(0.8)
+		print("[store] in_store=", store.in_store(), " prompt=", store.prompt())
+		interact(); await _wait_sim(0.5)
+		set_pos2(-47.4, -46.6); john.facing = 0.0; yaw = PI + 0.5; pitch = 0.25
+		await _wait_sim(0.5); print("[store] prompt=", store.prompt())
+		print("[store] case visible=", store.case_node.visible if store.case_node else "none", " at ", store.case_node.global_position if store.case_node else "")
+		debug_cam = {pos = Vector3(-49.6, 1.5, -48.6), at = Vector3(-47.4, 0.6, -46.4)}
+		await _wait_sim(0.1)
+		await _shot(prefix, "1_carry_to_register")
+		debug_cam = {}
+		interact(); await _wait_sim(5.3)
+		print("[store] paid=", store.paid, " cash=", store.cash)
+		await _shot(prefix, "2_paid")
+		# drop it in the fridge
+		set_pos2(4.6, -1.0); john.global_position.y = 0.02; john.facing = PI / 2; yaw = -PI / 2; await _wait_sim(0.5)
+		interact(); await _wait_sim(1.3)
+		await _shot(prefix, "3_stock_fridge")
+		await _wait_sim(1.5); print("[store] stock=", stock)
+		# rob it
+		armed = true; ammo = 15
+		set_pos2(-47.4, -46.9); john.global_position.y = -0.3; john.facing = 0.0; yaw = PI + 0.35; pitch = 0.18
+		await _wait_sim(0.6)
+		store.hands_up(); await _wait_sim(1.2)
+		debug_cam = {pos = Vector3(-49.0, 1.45, -47.8), at = Vector3(-47.4, 0.7, -44.0)}
+		await _wait_sim(0.1)
+		await _shot(prefix, "4_hands_up")
+		var J: Dictionary = store.clerk.J
+		var torso: Vector3 = (J.chest as Node3D).global_position
+		var dir: Vector3 = (torso - cam.global_position).normalized()
+		store.shoot_clerk({zone = "body", t = 0, part = "torso"}, torso, dir); await _wait_sim(1.2)
+		store.shoot_clerk({zone = "leg", t = 0, part = "thighL", side = "L"}, (J.thighL as Node3D).global_position, dir); await _wait_sim(1.0)
+		await _shot(prefix, "5_hurt")
+		var head: Vector3 = (J.head as Node3D).global_position
+		store.shoot_clerk({zone = "head", t = 0, part = "head"}, head, (head - cam.global_position).normalized())
+		await _wait_sim(3.5)
+		await _shot(prefix, "6_ragdoll")
+		print("[store] clerk=", store.rob.clerk, " prompt at register=", store.prompt())
+		set_pos2(-47.9, -44.2); await _wait_sim(0.3)
+		print("[store] till prompt=", store.prompt())
+		interact(); await _wait_sim(2.8)
+		print("[store] cash after till=", store.cash)
+		get_tree().quit(); return
+	if sc == "rob":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		armed = true; ammo = 15
+		set_pos2(-47.4, -46.9); john.global_position.y = -0.3; john.facing = 0.0; yaw = PI + 0.35; pitch = 0.18
+		debug_cam = {pos = Vector3(-50.2, 1.75, -43.35), at = Vector3(-47.4, 0.5, -44.2)}
+		await _wait_sim(0.6); store.hands_up(); await _wait_sim(1.2)
+		await _shot(prefix, "1_hands_up")
+		var J: Dictionary = store.clerk.J
+		var from := Vector3(-47.4, 1.5, -46.9)
+		var torso: Vector3 = (J.chest as Node3D).global_position
+		store.shoot_clerk({zone = "body", t = 0, part = "torso"}, torso, (torso - from).normalized()); await _wait_sim(1.0)
+		store.shoot_clerk({zone = "leg", t = 0, part = "thighL", side = "L"}, (J.thighL as Node3D).global_position, (torso - from).normalized()); await _wait_sim(1.2)
+		await _shot(prefix, "2_hurt_kneel")
+		var head: Vector3 = (J.head as Node3D).global_position
+		store.shoot_clerk({zone = "head", t = 0, part = "head"}, head, (head - from).normalized())
+		for k in 8:
+			await _wait_sim(0.25)
+			var ps := []
+			for b in store.rag: ps.append("%s:%s" % [b, (store.rag[b] as Node3D).global_position.snapped(Vector3(0.01, 0.01, 0.01))])
+			if k % 2 == 0: print("[rag] ", " ".join(ps.slice(0, 4)))
+		await _shot(prefix, "3_falling")
+		await _wait_sim(4.0); await _shot(prefix, "4_ragdoll_pool")
+		debug_cam = {pos = Vector3(-49.0, 1.6, -47.6), at = Vector3(-50.5, 0.6, -50.5)}
+		for i in 3: store._knock_products(Vector3(-50.5, 0.9, -50.0), Vector3(0, 0, 1), Vector3(0, 0, -1))
+		await _wait_sim(1.2); await _shot(prefix, "5_products")
+		get_tree().quit(); return
+	if sc == "ragtest":
+		start(); await _wait_sim(0.5)
+		var imp := float(_debug_args().get("imp", "0"))
+		var nj: bool = _debug_args().get("nojoints", "0") == "1"
+		store._go_ragdoll("torso", Vector3(0, 0, imp))
+		if nj:
+			for c in get_children(): if c is ConeTwistJoint3D: c.queue_free()
+		for k in 12:
+			await _wait_sim(0.25)
+			print("[rag] t=%.2f torso %s head %s shinL %s" % [k * 0.25, store.rag.torso.global_position.snapped(Vector3(0.01,0.01,0.01)), store.rag.head.global_position.snapped(Vector3(0.01,0.01,0.01)), store.rag.shinL.global_position.snapped(Vector3(0.01,0.01,0.01))])
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return

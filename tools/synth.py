@@ -130,6 +130,15 @@ def main(outdir):
     t = np.arange(SR * 2) / SR
     eng = (2 * ((60 * t) % 1) - 1) + np.sign(np.sin(2 * np.pi * 30 * t))
     S['engine_loop'] = filt(eng, 'lowpass', 700) * .09
+    o = buf(.6); tone(o, 420, 160, .4, .22, 0, 'sawtooth'); burst(o, 'bandpass', 900, 1.5, .3, .3); S['hurt'] = o
+    o = buf(.4); burst(o, 'lowpass', 160, gain=.6, dur=.25); tone(o, 80, 45, .2, .2); S['thud'] = o
+    o = buf(.7); tone(o, 2093, 2093.1, .5, .09); burst(o, 'lowpass', 400, gain=.3, dur=.12, when=.05); S['till_ding'] = o
+    for i in range(3):
+        o = buf(.25); burst(o, 'highpass', 2500 + i * 900, gain=.18, dur=.06); burst(o, 'lowpass', 600 + i * 200, gain=.25, dur=.12, when=.02); S['clink%d' % i] = o
+    # siren: square wave alternating 960 / 720 Hz every 1/1.4 s, two full cycles, lowpassed
+    n = int(SR * 2 / 1.4 * 2); t = np.arange(n) / SR
+    f = np.where((np.floor(t * 1.4) % 2) == 1, 960.0, 720.0); ph = 2 * np.pi * np.cumsum(f) / SR
+    S['siren_loop'] = filt(np.sign(np.sin(ph)), 'lowpass', 1800) * .035 * 3
     # loops: room tone, TV hiss, trip drone
     n = SR * 4; x = np.resize(NOISE, n)
     S['room_loop'] = filt(x, 'lowpass', 320) * .05 + filt(np.roll(x, 1234), 'bandpass', 900, 2) * .018
