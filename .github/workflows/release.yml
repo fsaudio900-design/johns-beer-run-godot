@@ -12,7 +12,7 @@ on:
 permissions:
   contents: write
 env:
-  GODOT: 4.3-stable
+  GODOT: 4.7.2-stable
 jobs:
   release:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
-# John's Beer Run: Godot 4.3 port (v2.9, stage 8, complete)
+# John's Beer Run: Godot 4.7 port (v2.12)
 
-To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
+To run it, open this folder in **Godot 4.7.2 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 
 ## Playing on Windows (no Godot needed)
 Each release on GitHub has:

@@ -305,7 +305,10 @@ func _step(o: Dictionary, target: Vector3, speed: float, dt: float, face_move :=
 
 func _ground(o: Dictionary, dt: float) -> void:
 	var node: Node3D = o.node
-	var q := PhysicsRayQueryParameters3D.create(node.global_position + Vector3(0, 1.2, 0), node.global_position + Vector3(0, -2, 0)); q.exclude = [g.john.get_rid()]
+	var ex := [g.john.get_rid()]
+	if g.car: ex.append(g.car.get_rid())
+	for c in cars: ex.append(c.body.get_rid())
+	var q := PhysicsRayQueryParameters3D.create(node.global_position + Vector3(0, 1.2, 0), node.global_position + Vector3(0, -2, 0)); q.exclude = ex
 	var hit = g.get_world_3d().direct_space_state.intersect_ray(q)
 	if hit: o.y = lerp(o.y, hit.position.y, 1.0 - exp(-dt * 12))
 	node.global_position.y = o.y
@@ -415,15 +418,9 @@ func _place_officer_gun(o: Dictionary) -> void:
 	gun.visible = node.aim_w > 0.08
 	if not gun.visible: return
 	var dir: Vector3 = node.aim_dir()
-	var palm: Vector3
-	if node.skin:
-		var hand: Vector3 = node.skin.bone_world("RightHand"); var mid: Vector3 = node.skin.bone_world("RightHandMiddle1")
-		var idx: Vector3 = node.skin.bone_world("RightHandIndex1"); var pk: Vector3 = node.skin.bone_world("RightHandPinky1")
-		palm = hand.lerp((mid + idx + pk) / 3.0, 0.55)
-	else:
-		palm = (node.J.wrR as Node3D).global_position + dir * 0.05
-	# grip in the palm, barrel along the aim, slide up
-	gun.global_transform = Transform3D(Basis.looking_at(-dir, Vector3.UP), palm + Vector3(0, -0.035, 0) - dir * 0.01)
+	var grip: Vector3 = node.skin.fist_world() if node.skin else (node.J.wrR as Node3D).global_position + dir * 0.05
+	# barrel along the aim, slide up, grip in the closed hand
+	gun.global_transform = Transform3D(Basis.looking_at(-dir, Vector3.UP), grip)
 
 func _officer_fire(o: Dictionary) -> void:
 	var gun: Node3D = o.gun

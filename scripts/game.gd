@@ -1815,7 +1815,7 @@ func _run_scenario(sc: String, prefix: String) -> void:
 			get_tree().quit(); return
 		police.resist()
 		debug_cam = {}
-		if mode == "long": hp = 1e9
+		if mode == "long" or mode == "grip": hp = 1e9
 		print("[arrest] resisted: state=", state, " hostile=", police.hostile, " gun_out=", gun_out())
 		for k in 5:
 			await _wait_sim(0.1)
@@ -1831,6 +1831,49 @@ func _run_scenario(sc: String, prefix: String) -> void:
 			var of2 := Vector3(sin(on.rotation.y), 0, cos(on.rotation.y)); var or2 := Vector3(-cos(on.rotation.y), 0, sin(on.rotation.y))
 			debug_cam = {pos = on.global_position + of2 * 1.6 + or2 * 1.4 + Vector3(0, 1.6, 0), at = on.global_position + Vector3(0, 1.1, 0)}
 			await _wait_sim(0.05); await _shot(prefix, "6_officer_walk_aim")
+			get_tree().quit(); return
+		if mode == "grip":
+			hp = 1e9
+			await _wait_sim(3.0)
+			var on: Node3D = police.officers[0].node
+			var c0 := on.global_position
+			var of2 := Vector3(sin(on.rotation.y), 0, cos(on.rotation.y)); var or2 := Vector3(-cos(on.rotation.y), 0, sin(on.rotation.y))
+			var hand: Vector3 = on.skin.bone_world("RightHand")
+			var JJ: Dictionary = on.J
+			var sh: Vector3 = (JJ.shR as Node3D).global_position; var el: Vector3 = (JJ.elR as Node3D).global_position; var wr: Vector3 = (JJ.wrR as Node3D).global_position
+			print("[grip] driver: upper=%.3f fore=%.3f sh-wr=%.3f grip_target=%.3f elbow_angle=%.1f" % [sh.distance_to(el), el.distance_to(wr), sh.distance_to(wr), sh.distance_to(on.grip_point()), rad_to_deg((el - sh).angle_to(wr - el))])
+			var sk = on.skin
+			var a: Vector3 = sk.bone_world("RightArm"); var f: Vector3 = sk.bone_world("RightForeArm"); var h: Vector3 = sk.bone_world("RightHand")
+			print("[grip] skin: upper=%.3f fore=%.3f sh-wr=%.3f elbow_angle=%.1f  hand-gun=%.3f" % [a.distance_to(f), f.distance_to(h), a.distance_to(h), rad_to_deg((f - a).angle_to(h - f)), h.distance_to(police.officers[0].gun.global_position)])
+			print("[grip] driver dirs upper=%s skin upper=%s" % [(el - sh).normalized(), (f - a).normalized()])
+			print("[grip] driver dirs fore=%s skin fore=%s" % [(wr - el).normalized(), (h - f).normalized()])
+			var Lh: Vector3 = on.skin.bone_world("LeftHand")
+			on.skin._reachable_grip()
+			print("[grip] wrists: R->target %.3f  L->target %.3f  R-L %.3f  L-fist %.3f  gun-fist %.3f" % [hand.distance_to(on.skin._wrist_target("R")), Lh.distance_to(on.skin._wrist_target("L")), hand.distance_to(Lh), on.skin.bone_world("LeftHandMiddle1").distance_to(on.skin.fist_world()), police.officers[0].gun.global_position.distance_to(on.skin.fist_world())])
+			for sd in ["R", "L"]:
+				var sdn := "Right" if sd == "R" else "Left"
+				var hw: Vector3 = on.skin.bone_world(sdn + "Hand"); var mw: Vector3 = on.skin.bone_world(sdn + "HandMiddle1"); var iw: Vector3 = on.skin.bone_world(sdn + "HandIndex1"); var pw: Vector3 = on.skin.bone_world(sdn + "HandPinky1"); var tw: Vector3 = on.skin.bone_world(sdn + "HandThumb1")
+				var dd: Array = on.skin._hand_dirs(sd)
+				var dact := (mw - hw).normalized()
+				var across := (iw - pw).normalized()                 # pinky -> index across the knuckles
+				var nact := dact.cross(across) * (1.0 if sd == "L" else -1.0)
+				print("[grip] %s d want=%s got=%s (%.0f deg)  n want=%s got~=%s (%.0f deg) thumb-dir=%s" % [sd, (dd[0] as Vector3).snapped(Vector3(0.01,0.01,0.01)), dact.snapped(Vector3(0.01,0.01,0.01)), rad_to_deg(dact.angle_to(dd[0])), (dd[1] as Vector3).snapped(Vector3(0.01,0.01,0.01)), nact.snapped(Vector3(0.01,0.01,0.01)), rad_to_deg(nact.angle_to(dd[1])), (tw - hw).normalized().snapped(Vector3(0.01,0.01,0.01))])
+			for sd in ["Right", "Left"]:
+				var out := []
+				for fg in ["Index", "Middle", "Pinky"]:
+					var p0: Vector3 = on.skin.bone_world(sd + "Hand"); var p1: Vector3 = on.skin.bone_world(sd + "Hand" + fg + "1"); var p2: Vector3 = on.skin.bone_world(sd + "Hand" + fg + "2"); var p3: Vector3 = on.skin.bone_world(sd + "Hand" + fg + "3")
+					out.append("%s %.0f/%.0f" % [fg, rad_to_deg((p1 - p0).angle_to(p2 - p1)), rad_to_deg((p2 - p1).angle_to(p3 - p2))])
+				print("[grip] curl ", sd, ": ", ", ".join(out), "  curl entries=", on.skin.curl.size())
+			var lamp := OmniLight3D.new(); lamp.omni_range = 3.0; lamp.light_energy = 2.5; add_child(lamp); lamp.global_position = hand + Vector3(0, 0.6, 0) + of2 * 0.6
+			var lamp2 := OmniLight3D.new(); lamp2.omni_range = 3.0; lamp2.light_energy = 1.5; add_child(lamp2); lamp2.global_position = hand - Vector3(0, 0.4, 0) + or2 * 0.6 - of2 * 0.2
+			var views := {g1_right = hand + or2 * 0.35 + of2 * 0.08 + Vector3(0, 0.03, 0), g2_left = hand - or2 * 0.4 + of2 * 0.1 + Vector3(0, 0.03, 0),
+				g3_top = hand + Vector3(0, 0.38, 0) - of2 * 0.1 + or2 * 0.03, g4_front = hand + of2 * 0.45 + or2 * 0.1 + Vector3(0, 0.06, 0),
+				g5_body = c0 + of2 * 1.8 + or2 * 1.6 + Vector3(0, 1.5, 0)}
+			for k in views:
+				debug_cam = {pos = views[k], at = hand if k != "g5_body" else c0 + Vector3(0, 1.2, 0)}
+				await _wait_sim(0.05); await _shot(prefix, k)
+			debug_cam = {}
+			await _wait_sim(0.1); await _shot(prefix, "g6_game_cam")
 			get_tree().quit(); return
 		if mode == "long":
 			# stand-off for a long time: the arms must not drift

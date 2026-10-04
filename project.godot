@@ -4,11 +4,11 @@ config_version=5
 [application]
 config/name="John's Beer Run"
 config/description="A game by Cessna"
-config/version="2.11"
+config/version="2.12"
 run/main_scene="res://scenes/main.tscn"
 config/icon="res://assets/icon/icon.png"
 config/windows_native_icon="res://assets/icon/game.ico"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 

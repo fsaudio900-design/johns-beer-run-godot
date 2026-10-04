@@ -26,7 +26,7 @@ func _ready() -> void:
 	for node in m.find_children("J_*", "", true, false):
 		J[String(node.name).trim_prefix("J_")] = node
 	if J.has("hips"): hips_y = J.hips.position.y
-	for n in J: rest_rot[n] = (J[n] as Node3D).rotation
+	for n in J: rest_rot[n] = (J[n] as Node3D).transform.basis.orthonormalized()
 	print("[visitor] ", model_path.get_file(), " joints ", J.size())
 	for mi: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -41,8 +41,10 @@ func _j(n: String) -> Node3D: return J.get(n)
 
 func pose(dt: float) -> void:
 	t += dt; k_t += dt
-	for n in ["shL", "shR", "elL", "elR", "wrL", "wrR"]:
-		if J.has(n): (J[n] as Node3D).rotation = rest_rot[n]
+	# full reset (rotation AND scale): the IK writes whole bases, and on Godot 4.7 resetting only the
+	# rotation keeps any float creep in the scale, which then snowballs into a twisted elbow
+	for n in ["shL", "shR", "elL", "elR", "wrL", "wrR", "fR0", "fR1", "fR2", "fR3", "fL0", "fL1", "fL2", "fL3"]:
+		if J.has(n): (J[n] as Node3D).transform.basis = rest_rot[n]
 	for k in blend: blend[k] = lerp(blend[k], 1.0 if anim == k else 0.0, 1.0 - exp(-dt * 6))
 	var br := sin(t * 1.7) * 0.012
 	var hips := _j("hips"); var spine := _j("spine"); var chest := _j("chest"); var head := _j("head")
@@ -87,6 +89,9 @@ func pose(dt: float) -> void:
 	aRx = lerp(aRx, up, a); aRz = lerp(aRz, 0.1, a); eRx = lerp(eRx, -0.08, a)
 	aLx = lerp(aLx, up + 0.12, a); aLz = lerp(aLz, -0.42, a); eLx = lerp(eLx, -0.45, a)
 	hx = lerp(hx, -aim_pitch * 0.5 + 0.08, a); hy = lerp(hy, 0.0, a)
+	# lean into the gun (shoulders forward over the hips) so the arms can push it out
+	if spine: spine.rotation.x += 0.1 * a
+	if chest: chest.rotation.x += 0.06 * a
 	# flinch from a bullet
 	flinch = max(0.0, flinch - dt * 2.2)
 	if flinch > 0:
@@ -100,9 +105,9 @@ func pose(dt: float) -> void:
 		for i in 4: _rx("fR%d" % i, 0.25)
 	for i in 4: _rx("fL%d" % i, lerp(0.25, 0.0, v))
 	# the pistol: fingers wrapped round the grip, both hands meeting on it in front of his chest
+	if skin:
+		skin.grip_w = aim_fingers; skin.grip_F = aim_dir(); skin.grip_U = Vector3.UP; skin.grip_P = grip_point()
 	if aim_fingers > 0.01:
-		for i in 4:
-			_rx("fR%d" % i, lerp(0.25, 1.45, aim_fingers)); _rx("fL%d" % i, lerp(0.25, 1.1, aim_fingers))
 		_aim_ik(aim_fingers)
 
 var aim_fingers := 0.0
@@ -116,7 +121,7 @@ func aim_dir() -> Vector3:
 
 func grip_point() -> Vector3:
 	var sL: Vector3 = (J.shL as Node3D).global_position; var sR: Vector3 = (J.shR as Node3D).global_position
-	return (sL + sR) * 0.5 + aim_dir() * 0.6 + Vector3(0, -0.06, 0)
+	return (sL + sR) * 0.5 + aim_dir() * 0.5 + Vector3(0, -0.07, 0)
 
 func _aim_ik(w: float) -> void:
 	if not (J.has("shR") and J.has("elR") and J.has("wrR") and J.has("shL")): return
@@ -140,9 +145,15 @@ func _two_bone(sh: Node3D, el: Node3D, wr: Node3D, T: Vector3, w: float, pole: V
 	var pv := pole - S; pv = pv - dir * pv.dot(dir)
 	if pv.length_squared() < 1e-6: pv = Vector3.DOWN
 	var E := S + dir * x + pv.normalized() * h
-	sh.global_basis = Basis(SkinDriver._arc((el.global_position - S).normalized(), (E - S).normalized())) * sh.global_basis
+	_rotate_global(sh, SkinDriver._arc((el.global_position - S).normalized(), (E - S).normalized()))
 	var Ec := el.global_position
-	el.global_basis = Basis(SkinDriver._arc((wr.global_position - Ec).normalized(), (S + dir * d - Ec).normalized())) * el.global_basis
+	_rotate_global(el, SkinDriver._arc((wr.global_position - Ec).normalized(), (S + dir * d - Ec).normalized()))
+
+## rotate a joint in world space, written back as a clean local rotation (no scale/skew creep)
+func _rotate_global(j: Node3D, q: Quaternion) -> void:
+	var pq: Quaternion = (j.get_parent() as Node3D).global_basis.get_rotation_quaternion()
+	var gq: Quaternion = q * j.global_basis.get_rotation_quaternion()
+	j.transform.basis = Basis((pq.inverse() * gq).normalized())
 
 func _rx(n: String, a: float) -> void:
 	var j := _j(n)

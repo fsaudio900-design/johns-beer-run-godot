@@ -168,6 +168,28 @@ def police(objdir, cashier_glb, dst):
         out[arm, 2] = P[arm, 2] * th
         return out
     wV = warp(cV); wJ = warp(jp)
+    # hands: the arm warp above fattens the arms to fit his jacket sleeves, which also spreads her
+    # fingers far too wide. Map hand to hand instead, box to box, using the bare skin of each hand
+    # (police: the Body material; cashier: everything past her sleeve), blending in over the wrist.
+    body = np.zeros(len(V), bool)
+    body_idx = sorted({c[0] for m, tri in faces if m == 'Body' for c in tri})
+    body[body_idx] = True
+    for sgn in (1.0, -1.0):
+        ph = V[body & (V[:, 0] * sgn > 40)]
+        ch = cV[cV[:, 0] * sgn > 64.0]
+        cmin, cmax = ch.min(0), ch.max(0); pmin, pmax = ph.min(0), ph.max(0)
+        cmin[0], cmax[0] = np.abs(ch[:, 0]).min(), np.abs(ch[:, 0]).max(); pmin[0], pmax[0] = np.abs(ph[:, 0]).min(), np.abs(ph[:, 0]).max()
+        def hand_map(P):
+            Q = np.empty_like(P)
+            Q[:, 0] = sgn * (pmin[0] + (np.abs(P[:, 0]) - cmin[0]) * (pmax[0] - pmin[0]) / (cmax[0] - cmin[0]))
+            for a in (1, 2): Q[:, a] = pmin[a] + (P[:, a] - cmin[a]) * (pmax[a] - pmin[a]) / (cmax[a] - cmin[a])
+            return Q
+        for arr, src in ((wV, cV), (wJ, jp)):
+            sel = src[:, 0] * sgn > cmin[0] - 4.0
+            if not sel.any(): continue
+            k = np.clip((np.abs(src[sel, 0]) - (cmin[0] - 4.0)) / 4.0, 0, 1)[:, None]
+            arr[sel] = arr[sel] * (1 - k) + hand_map(src[sel]) * k
+        print('hand %+d: cashier x %.1f-%.1f -> police x %.1f-%.1f' % (sgn, cmin[0], cmax[0], pmin[0], pmax[0]))
     # end joints sitting at the origin in bind data keep their FK positions (already in jp)
     tree = cKDTree(wV)
     d, nb = tree.query(V, k=8)
