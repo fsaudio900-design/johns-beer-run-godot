@@ -38,6 +38,7 @@ var hips_rest := Vector3.ZERO        # skeleton space
 var hips_rest_joint := Vector3.ZERO  # skeleton space
 var rag := {}                        # part -> [body, Transform3D body->joint]
 var rag_hips := Transform3D()
+var bone_ix := {}                    # clean Mixamo name -> bone idx
 
 static func _clean(n: String) -> String:
 	n = n.get_slice(":", n.get_slice_count(":") - 1)
@@ -59,6 +60,7 @@ func setup(visitor: Node3D, path: String) -> void:
 	skel = model.find_children("*", "Skeleton3D", true, false)[0]
 	var names := {}
 	for b in skel.get_bone_count(): names[_clean(skel.get_bone_name(b))] = b
+	bone_ix = names
 	# height + facing + feet on the floor: rest pose height of the skinned mesh in rig space
 	var mlo := INF; var mhi := -INF
 	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
@@ -117,6 +119,11 @@ static func _arc(a: Vector3, b: Vector3) -> Quaternion:
 		if ax.length_squared() < 1e-6: ax = a.cross(Vector3.UP)
 		return Quaternion(ax.normalized(), PI)
 	return Quaternion(a.cross(b).normalized(), acos(clamp(d, -1.0, 1.0)))
+
+## world position of a bone of the skinned model ("RightHand", "Head"...)
+func bone_world(bone: String) -> Vector3:
+	if skel == null or not bone_ix.has(bone): return Vector3.ZERO
+	return skel.global_transform * skel.get_bone_global_pose(bone_ix[bone]).origin
 
 ## the procedural joints follow the ragdoll bodies from now on
 func follow_ragdoll(bodies: Dictionary) -> void:

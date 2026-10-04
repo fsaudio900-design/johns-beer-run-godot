@@ -12,7 +12,11 @@ var J := {}
 var anim := "idle"
 var t := 0.0
 var k_t := 0.0
-var blend := {knock = 0.0, walk = 0.0, wave = 0.0, hands = 0.0}
+var blend := {knock = 0.0, walk = 0.0, wave = 0.0, hands = 0.0, cuff = 0.0}
+var aiming := false          # arms up on a two-handed pistol grip, independent of the legs (walk or idle)
+var aim_pitch := 0.0         # radians, + = aiming up
+var aim_w := 0.0
+var flinch := 0.0            # a hit: knocked back a step
 var hips_y := 0.95
 
 func _ready() -> void:
@@ -69,6 +73,22 @@ func pose(dt: float) -> void:
 	aLx = lerp(aLx, -0.3, hu); aLz = lerp(aLz, 2.75, hu); eLx = lerp(eLx, -1.0, hu)
 	aRx = lerp(aRx, -0.3, hu); aRz = lerp(aRz, -2.75, hu); eRx = lerp(eRx, -1.0, hu)
 	if hu > 0.01: hx += 0.12 * hu; hips.position.y -= 0.03 * hu
+	# cuffing: both hands forward and down onto the wrists in front of him
+	var cf: float = blend.cuff
+	aLx = lerp(aLx, -0.95, cf); aLz = lerp(aLz, -0.3, cf); eLx = lerp(eLx, -0.7, cf)
+	aRx = lerp(aRx, -0.95, cf); aRz = lerp(aRz, 0.3, cf); eRx = lerp(eRx, -0.7, cf)
+	hx = lerp(hx, 0.35, cf)
+	# two-handed pistol aim
+	aim_w = lerp(aim_w, 1.0 if aiming else 0.0, 1.0 - exp(-dt * 9))
+	var a := aim_w; var up := -(PI / 2 + aim_pitch)
+	aRx = lerp(aRx, up, a); aRz = lerp(aRz, 0.1, a); eRx = lerp(eRx, -0.08, a)
+	aLx = lerp(aLx, up + 0.12, a); aLz = lerp(aLz, -0.42, a); eLx = lerp(eLx, -0.45, a)
+	hx = lerp(hx, -aim_pitch * 0.5 + 0.08, a); hy = lerp(hy, 0.0, a)
+	# flinch from a bullet
+	flinch = max(0.0, flinch - dt * 2.2)
+	if flinch > 0:
+		if spine: spine.rotation.x -= 0.35 * flinch
+		hx -= 0.25 * flinch
 	if head: head.rotation = Vector3(hx, hy, 0)
 	_set_rot("shL", Vector3(aLx, 0, aLz)); _rx("elL", eLx)
 	_set_rot("shR", Vector3(aRx, 0, aRz)); _rx("elR", eRx)

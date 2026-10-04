@@ -594,7 +594,7 @@ func update(dt: float) -> void:
 				rob.groan_t -= dt
 				if rob.groan_t < 0: rob.groan_t = 6 + randf() * 5; c_say(["Ugh...", "Somebody call 911...", "Ow. Ow. Ow."].pick_random(), 2.0)
 	# aiming at Dale (or near him) makes him put his hands up
-	if g.armed and not g.gun_hidden and g.aim_t > 0.5 and inside and rob.clerk == "idle":
+	if g.gun_out() and g.aim_t > 0.5 and inside and rob.clerk == "idle":
 		var cam: Camera3D = g.cam
 		var dir := -cam.global_transform.basis.z
 		var J: Dictionary = clerk.J

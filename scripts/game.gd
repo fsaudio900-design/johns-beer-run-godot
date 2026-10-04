@@ -129,7 +129,11 @@ const GUN_TWIST := -1.35
 var gun_rig: Node3D
 var gun_muzzle := Vector3.ZERO
 var armed := false
-var gun_hidden := false
+var gun_hidden := false          # hands busy (snorting, carrying...): gun put away for the moment
+var holstered := false           # Z: gun on the hip
+var hp := 100.0                  # only the police can take this away
+var hurt_t := 0.0                # red flash after a hit
+var since_hit := 99.0
 var ammo := 15
 var reload_t := 0.0
 var fire_cd := 0.0
@@ -589,7 +593,9 @@ func _input(e: InputEvent) -> void:
 	elif e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED: _capture(true)
 		elif e.button_index == MOUSE_BUTTON_LEFT and armed: fire()
-		elif e.button_index == MOUSE_BUTTON_RIGHT: rmb_down = true
+		elif e.button_index == MOUSE_BUTTON_RIGHT:
+			rmb_down = true
+			if holstered and state == "walking": toggle_holster(false)      # right-click draws
 		elif e.button_index == MOUSE_BUTTON_WHEEL_UP: dist = clamp(dist - 0.2, 1.8, 5.0)
 		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN: dist = clamp(dist + 0.2, 1.8, 5.0)
 	elif e is InputEventMouseButton and not e.pressed and e.button_index == MOUSE_BUTTON_RIGHT: rmb_down = false
@@ -597,6 +603,9 @@ func _input(e: InputEvent) -> void:
 		reload_t = 1.3; Sfx.play("reload")
 	elif e is InputEventKey and e.keycode == KEY_SPACE: handbrake = e.pressed
 	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_H and state == "driving": Sfx.play("horn")
+	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_Z and armed and state == "walking" and reload_t <= 0:
+		toggle_holster(not holstered)
+	elif e.is_action_pressed("interact") and not e.is_echo() and police and police.can_resist(): police.resist()
 	elif e.is_action_pressed("interact") and not e.is_echo(): interact()
 	elif e.is_action_pressed("peephole") and not e.is_echo() and state == "walking":
 		if peeping: toggle_peep(false)
@@ -627,7 +636,7 @@ func _physics_process(dt: float) -> void:
 			if not (aim_t > 0.3 or aim_hold > 0): john.facing = lerp_angle(john.facing, atan2(mx, mz), 1.0 - exp(-dt * 10.0))
 		fwd_in = iz > 0 and ix == 0
 		if aim_t > 0.5: vel.x *= 0.55; vel.z *= 0.55
-		if armed and not gun_hidden and (aim_t > 0.3 or aim_hold > 0): john.facing = lerp_angle(john.facing, yaw + PI, 1.0 - exp(-dt * 18))
+		if gun_out() and (aim_t > 0.3 or aim_hold > 0): john.facing = lerp_angle(john.facing, yaw + PI, 1.0 - exp(-dt * 18))
 		vel += lurch; lurch *= exp(-dt * 3.5)
 		john.velocity.x = vel.x; john.velocity.z = vel.z
 		john.velocity.y = -0.5 if john.is_on_floor() else john.velocity.y - 9.8 * dt
@@ -695,7 +704,7 @@ func _process(dt: float) -> void:
 	flush_cd = max(0.0, flush_cd - dt)
 
 	# ---- John's pose + held props
-	john.grip_w = 1.0 if armed and not gun_hidden else 0.0
+	john.grip_w = 1.0 if gun_out() else 0.0
 	if store: store.update(dt)
 	john.apply_pose(clock_t, float(beers) / MAX_BEERS)
 	_update_gun(dt)
@@ -782,6 +791,9 @@ func _process(dt: float) -> void:
 	drunk_vis = lerp(drunk_vis, drunk_level(), 1.0 - exp(-dt * 0.8))
 	high_vis = lerp(high_vis, clamp(boost_t / 6.0, 0.0, 1.0) if boost_t > 0 else 0.0, 1.0 - exp(-dt * 2.5))
 	flash_t = max(0.0, flash_t - dt)
+	hurt_t = max(0.0, hurt_t - dt); since_hit += dt
+	if hp > 0 and hp < 100 and since_hit > 6.0: hp = min(100.0, hp + dt * 5.0)
+	hud.set_health(hp, hp < 100 or (police != null and police.hostile))
 	hud.set_pill("boost", boost_t)
 	fade = move_toward(fade, fade_target, dt / 2.5)
 
@@ -796,6 +808,7 @@ func _process(dt: float) -> void:
 	m.set_shader_parameter("u_vignette", 0.35 + drunk_level() * 0.5)
 	m.set_shader_parameter("u_fade", fade)
 	m.set_shader_parameter("u_peep", peep_vis)
+	m.set_shader_parameter("u_hurt", clamp(hurt_t * 1.6 + (1.0 - hp / 100.0) * 0.55, 0.0, 1.0))
 
 func _update_props(_dt: float) -> void:
 	if n.has("Bong"):
@@ -898,7 +911,7 @@ func _update_camera(dt: float) -> void:
 		var want := atan2(cos(f), -sin(f)) - 0.45 if bong_active else atan2(-cos(f), sin(f)) + 0.35
 		yaw = lerp_angle(yaw, want, 1.0 - exp(-dt * 3)); pitch = lerp(pitch, 0.22, 1.0 - exp(-dt * 3))
 		tgt = tgt.lerp(head - Vector3(0, 0.12, 0), 0.85)
-	var aiming := armed and not gun_hidden and state == "walking" and rmb_down and not peeping
+	var aiming := gun_out() and state == "walking" and rmb_down and not peeping
 	aim_t = lerp(aim_t, 1.0 if aiming else 0.0, 1.0 - exp(-dt * 12))
 	if aim_t > 0.01:
 		tgt += Vector3(cos(yaw), 0, -sin(yaw)) * 0.4 * aim_t
@@ -1083,7 +1096,45 @@ func _build_gun() -> void:
 	hole_mat = StandardMaterial3D.new(); hole_mat.albedo_color = Color(0.04, 0.03, 0.02, 0.92); hole_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	hole_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; hole_mat.albedo_texture = puff_tex
 
+func gun_out() -> bool: return armed and not gun_hidden and not holstered
+
+## the Glock on John's right hip: muzzle down, slide facing forward
+func holster_world() -> Transform3D:
+	var d := side_dirs()
+	var fwd := Vector3(d.fx, 0, d.fz); var right := Vector3(d.rx, 0, d.rz)
+	var z := Vector3.DOWN; var y := fwd; var x := y.cross(z)
+	return Transform3D(Basis(x, y, z), john.global_position + Vector3(0, 0.98, 0) + right * 0.34 - fwd * 0.04)
+
+func toggle_holster(on: bool) -> void:
+	if not armed or on == holstered: return
+	holstered = on
+	rmb_down = false if on else rmb_down
+	Sfx.play("rack" if not on else "thunk", -8.0 if on else -2.0, 1.25 if on else 1.0)
+	if on: john.snort_ik.w = 0.0; john.left_ik.w = 0.0
+
+## a police bullet found John
+func john_hit(dmg: float, dir: Vector3) -> void:
+	if hp <= 0 or state == "end": return
+	hp = max(0.0, hp - dmg); hurt_t = 0.45; since_hit = 0.0
+	Sfx.play("hurt", -2.0, 0.9 + randf() * 0.2)
+	var chest := john.global_position + Vector3(0, 1.25, 0)
+	if store: store.spray(chest, dir, 8, 1.6)
+	lurch += Vector3(dir.x, 0, dir.z).normalized() * 0.8
+	if hp <= 0: john_down()
+	elif randf() < 0.4: say(["Agh!", "Ow! Son of a...", "I'm hit! I'm hit!", "That's gonna leave a mark."].pick_random(), 1.6)
+
+func john_down() -> void:
+	if state == "driving": car.v = 0.0
+	set_state("busy"); hud.prompt(""); rmb_down = false; gun_hidden = true
+	john.snort_ik.w = 0.0; john.left_ik.w = 0.0
+	say("Ugh...", 1.4)
+	var _fall := func(k, _t): john.pose.squat = sm(k); john.pose.bend = sm(k) * 0.95
+	tween(1.1, _fall, func(): pass)
+	get_tree().create_timer(1.2).timeout.connect(func(): Sfx.play("thud"); fade_target = 0.6)
+	get_tree().create_timer(2.6).timeout.connect(func(): if state == "busy": mission_failed("John drew on the Pine Hollow PD. The Pine Hollow PD drew faster.", "SHOT DOWN"))
+
 func gun_reset() -> void:
+	holstered = false; hp = 100.0; hurt_t = 0.0; since_hit = 99.0
 	armed = false; gun_hidden = false; ammo = 15; reload_t = 0; aim_t = 0; aim_hold = 0; rmb_down = false
 	_place_gun_on_table()
 	for h in holes: if is_instance_valid(h): h.queue_free()
@@ -1139,7 +1190,7 @@ func _is_mirror(collider: Object) -> bool:
 	return false
 
 func fire() -> void:
-	if not armed or gun_hidden or state != "walking" or fire_cd > 0 or reload_t > 0 or peeping: return
+	if not gun_out() or state != "walking" or fire_cd > 0 or reload_t > 0 or peeping: return
 	if ammo <= 0: reload_t = 1.3; Sfx.play("reload"); return
 	ammo -= 1; fire_cd = 0.13; aim_hold = 0.6; Sfx.play("shot")
 	update_aim()
@@ -1151,7 +1202,9 @@ func fire() -> void:
 	if debug_run: print("[fire] muzzle·aim=", gun_rig.global_transform.basis.z.normalized().dot((aim_point - muzzle).normalized()), " up=", gun_rig.global_transform.basis.y, " hit=", aim_hit.get("collider"), " at ", aim_hit.get("position"))
 	pitch = clamp(pitch - 0.03, -0.45, 1.0); yaw += (randf() - 0.5) * 0.012
 	var cam_dir := -cam.global_transform.basis.z
-	if store and store.on_shot(cam.global_position, cam_dir, aim_hit):
+	if police and police.on_shot(cam.global_position, cam_dir, aim_hit):
+		flash_mark = 0.15
+	elif store and store.on_shot(cam.global_position, cam_dir, aim_hit):
 		flash_mark = 0.15
 	elif aim_hit:
 		var nrm: Vector3 = aim_hit.normal
@@ -1216,7 +1269,10 @@ func _update_gun(dt: float) -> void:
 	flash_mark = max(0.0, flash_mark - dt)
 	hud.set_aim(aim_t > 0.5 and state == "walking", flash_mark > 0 and aim_t > 0.5)
 	# the gun in John's hand, aim IK
-	if armed and gun_rig:
+	if armed and gun_rig and holstered:
+		gun_rig.visible = state != "driving"
+		gun_rig.global_transform = holster_world()
+	elif armed and gun_rig:
 		gun_rig.visible = not gun_hidden
 		if not gun_hidden:
 			gun_rig.global_transform = john.gun_world()
@@ -1714,6 +1770,70 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		var y0: float = john.global_position.y
 		Input.action_press("move_forward"); await _wait_sim(2.0); Input.action_release("move_forward")
 		print("[bugs] porch: from y %.2f z %.2f to y %.2f z %.2f" % [y0, -9.6, john.global_position.y, john.global_position.z])
+		get_tree().quit(); return
+	if sc == "arrest":
+		var mode: String = _debug_args().get("mode", "cuff")
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		while police.nav_ready < 2: await _wait_sim(0.5)
+		set_pos2(-47.4, -46.9); john.global_position.y = -0.3; store.hands_up(); await _wait_sim(0.5)
+		armed = true; ammo = 15
+		set_pos2(-30.0, -29.0); john.global_position.y = -0.4; john.facing = PI * 0.5; yaw = john.facing - PI
+		await _wait_sim(0.3)
+		toggle_holster(true); await _wait_sim(0.3)
+		var jp := john.global_position
+		debug_cam = {pos = jp + Vector3(0.3, 1.3, 1.6), at = jp + Vector3(0, 0.95, 0)}
+		await _wait_sim(0.1); await _shot(prefix, "0_holstered")
+		if mode == "holster": print("[holster] gun visible=", gun_rig.visible, " at ", gun_rig.global_position, " john ", john.global_position); get_tree().quit(); return
+		police._arrest(police.cars[2], null)
+		var side := Vector3(-cos(john.facing), 0, sin(john.facing))
+		debug_cam = {pos = jp + side * 4.5 + Vector3(0, 1.7, 0), at = jp + Vector3(sin(john.facing), 0, cos(john.facing)) * 1.2 + Vector3(0, 1.0, 0)}
+		await _wait_sim(1.4); await _shot(prefix, "1_hands_up")
+		var fdir := Vector3(sin(john.facing), 0, cos(john.facing))
+		debug_cam = {pos = jp + fdir * 1.6 + side * 0.9 + Vector3(0, 1.5, 0), at = jp + Vector3(0, 1.3, 0)}
+		await _wait_sim(0.05); await _shot(prefix, "1b_hands_front")
+		debug_cam = {pos = jp + side * 4.5 + Vector3(0, 1.7, 0), at = jp + fdir * 1.2 + Vector3(0, 1.0, 0)}
+		print("[arrest] can_resist=", police.can_resist(), " state=", state)
+		if mode == "cuff":
+			await _wait_sim(1.9); await _shot(prefix, "2_walk_round")
+			await _wait_sim(1.4); await _shot(prefix, "3_cuffed")
+			var fd2 := Vector3(sin(john.facing), 0, cos(john.facing))
+			debug_cam = {pos = john.global_position - fd2 * 1.0 + side * 1.6 + Vector3(0, 1.5, 0), at = john.global_position + Vector3(0, 1.0, 0)}
+			await _wait_sim(0.05); await _shot(prefix, "3b_cuffed_back")
+			await _wait_sim(3.0); print("[arrest] state=", state); await _shot(prefix, "4_busted")
+			get_tree().quit(); return
+		police.resist()
+		debug_cam = {}
+		print("[arrest] resisted: state=", state, " hostile=", police.hostile, " gun_out=", gun_out())
+		for k in 5:
+			await _wait_sim(0.1)
+			print("[draw] gun_out=", gun_out(), " aim_hold=%.2f aim_t=%.2f ik=%.2f visible=%s facing=%.2f yaw=%.2f" % [aim_hold, aim_t, john.snort_ik.w, gun_rig.visible, john.facing, yaw])
+		await _shot(prefix, "2_draw")
+		if mode == "die":
+			for k in 40:
+				await _wait_sim(0.5)
+				if state == "end": break
+			await get_tree().create_timer(3.0).timeout
+			print("[die] state=", state, " hp=", hp)
+			await _wait_sim(0.5); await _shot(prefix, "5_shot_down")
+			get_tree().quit(); return
+		for k in 8:
+			await _wait_sim(0.5)
+			var hs := []
+			for o in police.officers: hs.append("%s:%.0f/%d d%.1f" % [o.mode, o.hp, o.shots, (o.node as Node3D).global_position.distance_to(john.global_position)])
+			print("[fight] t=%.1f hp=%.0f officers %s" % [k * 0.5, hp, " ".join(hs)])
+		await _shot(prefix, "3_shootout")
+		for k in 3:
+			if police.officers.is_empty(): break
+			var off: Node3D = police.officers[0].node
+			var from := john.global_position + Vector3(0, 1.5, 0)
+			var tgt: Vector3 = (off.J.chest as Node3D).global_position
+			var hit_any: bool = police.on_shot(from, (tgt - from).normalized(), {})
+			print("[fight] John fires: hit=", hit_any, " officers left=", police.officers.size())
+			await _wait_sim(0.3)
+		await _wait_sim(2.5)
+		var bp: Vector3 = (police.dead[0].bodies.torso as Node3D).global_position if police.dead.size() else jp
+		debug_cam = {pos = bp + Vector3(2.2, 1.9, 1.6), at = bp}
+		await _wait_sim(0.1); await _shot(prefix, "4_officer_down")
 		get_tree().quit(); return
 	if sc == "police":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)

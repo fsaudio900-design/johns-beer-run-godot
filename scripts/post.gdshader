@@ -9,6 +9,7 @@ uniform float u_high = 0.0;
 uniform float u_trip = 0.0;
 uniform float u_peep = 0.0;
 uniform float u_flash = 0.0;
+uniform float u_hurt = 0.0;
 uniform float u_fade = 0.0;
 uniform float u_vignette = 0.35;
 
@@ -84,6 +85,11 @@ void fragment() {
 	}
 	col += (fract(sin(dot(suv * res + fract(t) * 91.7, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.016;
 	col += u_flash;
+	if (u_hurt > 0.001) {
+		float hr = length((suv - 0.5) * vec2(res.x / res.y, 1.0));
+		float edge = smoothstep(0.18, 0.78, hr);
+		col = mix(col, vec3(0.5, 0.0, 0.02), clamp(u_hurt * (0.25 + edge), 0.0, 0.85));
+	}
 	col = mix(col, vec3(0.0), u_fade);
 	COLOR = vec4(clamp(col, 0.0, 1.0), 1.0);
 }

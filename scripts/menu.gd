@@ -8,7 +8,7 @@ signal menu_pressed
 signal retry_pressed
 signal pause_action(act: String)
 
-const VERSION := "v2.10"
+const VERSION := "v2.11"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")
@@ -102,6 +102,9 @@ func _build_title() -> void:
 		["W A S D", "Walk (Shift to stumble faster)"],
 		["Mouse", "Look around. Click the game to capture the cursor, Esc for the pause"],
 		["E", "Get up, grab a beer, sit and drink, do a line, hit the bong, open doors"],
+		["Right / Left click", "Aim and fire the Glock (R to reload)"],
+		["Z", "Holster or draw the Glock"],
+		["E (when cuffed)", "Resist arrest: pull the gun and shoot it out with the police"],
 		["", "Five beers and John is out for the night."]])
 	panels.credits = _panel(right, "Credits", [
 		["A game by", "Cessna"], ["Created and directed by", "Cessna"], ["Game design", "Cessna"],

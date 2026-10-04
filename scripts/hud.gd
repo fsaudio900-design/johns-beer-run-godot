@@ -27,6 +27,9 @@ var sub_t := 0.0
 var speedo: PanelContainer
 var mph_lbl: Label
 var ammo_box: PanelContainer
+var hp_box: PanelContainer
+var hp_fill: ColorRect
+var hp_shown := 100.0
 var ammo_n: Label
 var xhair: Panel
 var hitmark: Control
@@ -112,6 +115,15 @@ func _build_top() -> void:
 	ar.add_child(_label("GLOCK 19", f_body_bold, 12, INK, Color(0, 0, 0, 0)))
 	ammo_n = _label("15", f_body_bold, 14, Color("#ffd36b"), Color(0, 0, 0, 0)); ar.add_child(ammo_n)
 	right.add_child(ammo_box)
+	# health (only shows once the police are shooting, or John is hurt)
+	hp_box = PanelContainer.new(); hp_box.add_theme_stylebox_override("panel", sb(Color(0, 0, 0, 0.6), 999, LINE, 1, Vector4(11, 6, 11, 6)))
+	hp_box.size_flags_horizontal = Control.SIZE_SHRINK_END; hp_box.visible = false
+	var hr := HBoxContainer.new(); hr.add_theme_constant_override("separation", 8); hp_box.add_child(hr)
+	var hl := _label("HEALTH", f_body_bold, 12, INK, Color(0, 0, 0, 0)); hl.size_flags_vertical = Control.SIZE_SHRINK_CENTER; hr.add_child(hl)
+	var track := ColorRect.new(); track.color = Color(1, 1, 1, 0.15); track.custom_minimum_size = Vector2(110, 8); track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hr.add_child(track)
+	hp_fill = ColorRect.new(); hp_fill.color = Color("#ff5a4a"); hp_fill.size = Vector2(110, 8); track.add_child(hp_fill)
+	right.add_child(hp_box)
 	# crosshair + hit marker
 	xhair = Panel.new(); var xs := StyleBoxFlat.new(); xs.bg_color = Color(0, 0, 0, 0); xs.set_corner_radius_all(13); xs.set_border_width_all(2)
 	xs.border_color = Color(1, 1, 1, 0.85); xs.shadow_color = Color(0, 0, 0, 0.5); xs.shadow_size = 1
@@ -242,6 +254,12 @@ func _process(dt: float) -> void:
 
 func set_ammo(visible_: bool, text: String) -> void:
 	ammo_box.visible = visible_; ammo_n.text = text
+
+func set_health(v: float, show: bool) -> void:
+	hp_box.visible = show
+	hp_shown = lerp(hp_shown, v, 0.2)
+	hp_fill.size = Vector2(110.0 * clamp(hp_shown / 100.0, 0.0, 1.0), 8)
+	hp_fill.color = Color("#ff5a4a") if v < 35 else (Color("#ffd36b") if v < 70 else Color("#9fe28a"))
 
 func set_aim(xh: bool, hit: bool) -> void:
 	xhair.visible = xh; hitmark.visible = hit
