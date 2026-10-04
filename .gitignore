@@ -1,0 +1,12 @@
+# Godot cache / imports (rebuilt automatically on first open)
+.godot/
+*.tmp
+# textures Godot extracts from the .glb files on import
+assets/world/*_[0-9]*.png
+assets/world/*_[0-9]*.jpg
+assets/world/*_[0-9]*.png.import
+assets/world/*_[0-9]*.jpg.import
+assets/chars/*_[0-9]*.png
+assets/chars/*_[0-9]*.jpg
+assets/chars/*_[0-9]*.png.import
+assets/chars/*_[0-9]*.jpg.import
