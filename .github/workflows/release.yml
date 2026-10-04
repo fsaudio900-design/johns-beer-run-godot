@@ -52,7 +52,10 @@ jobs:
           godot --headless --import || true
           godot --headless --import
           mkdir -p build dist
-          godot --headless --export-release "Windows Desktop" build/JohnsBeerRun.exe
+          godot --headless --export-release "Windows Desktop" build/JohnsBeerRun.exe > build/export.log 2>&1 || true
+          if [ ! -s build/JohnsBeerRun.exe ]; then
+            tail -n 15 build/export.log | while IFS= read -r l; do echo "::error title=export::$l"; done; exit 1
+          fi
           ls -la build
       - name: Publish
         if: steps.todo.outputs.tags != ''
@@ -66,7 +69,10 @@ jobs:
             tail -n +2 "$NOTES" > dist/notes.md
             git archive --format=zip --prefix=JohnsBeerRun/ -o "dist/JohnsBeerRun-$TAG.zip" HEAD
             (cd build && zip -q -9 "../dist/JohnsBeerRun-Windows-$TAG.zip" JohnsBeerRun.exe)
-            ./tools/installer/build.sh "$VER" build/JohnsBeerRun.exe dist
+            if ! ./tools/installer/build.sh "$VER" build/JohnsBeerRun.exe dist > dist/installer.log 2>&1; then
+              tail -n 15 dist/installer.log | while IFS= read -r l; do echo "::error title=installer::$l"; done; exit 1
+            fi
+            ls -la dist | while IFS= read -r l; do echo "::notice title=dist::$l"; done
             gh release create "$TAG" "dist/JohnsBeerRun-Setup-$TAG.exe" "dist/JohnsBeerRun-Windows-$TAG.zip" "dist/JohnsBeerRun-$TAG.zip" \
               --target "$GITHUB_SHA" --title "$TITLE" --notes-file dist/notes.md --latest
             echo "published $TAG"
