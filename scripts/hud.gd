@@ -24,6 +24,8 @@ var ampm_lbl: Label
 var pills := {}
 var sub: RichTextLabel
 var sub_t := 0.0
+var speedo: PanelContainer
+var mph_lbl: Label
 var ammo_box: PanelContainer
 var ammo_n: Label
 var xhair: Panel
@@ -97,6 +99,12 @@ func _build_top() -> void:
 	# status pills
 	pills.boost = _pill(right, "WIRED", Color("#e8f3ff"), Color("#0d1a2a"))
 	pills.trip = _pill(right, "TRIPPING", Color("#ff9ad8"), Color("#120a1e"))
+	speedo = PanelContainer.new(); speedo.add_theme_stylebox_override("panel", sb(Color("#e8f3ff"), 999, Color(0, 0, 0, 0), 0, Vector4(11, 5, 11, 5)))
+	speedo.size_flags_horizontal = Control.SIZE_SHRINK_END; speedo.visible = false
+	var srow := HBoxContainer.new(); srow.add_theme_constant_override("separation", 5); speedo.add_child(srow)
+	mph_lbl = _label("0", f_body_bold, 14, Color("#0d1a2a"), Color(0, 0, 0, 0)); srow.add_child(mph_lbl)
+	srow.add_child(_label("MPH", f_body_bold, 12, Color("#0d1a2a"), Color(0, 0, 0, 0)))
+	right.add_child(speedo)
 	ammo_box = PanelContainer.new(); ammo_box.add_theme_stylebox_override("panel", sb(Color(0, 0, 0, 0.6), 999, LINE, 1, Vector4(11, 5, 11, 5)))
 	ammo_box.size_flags_horizontal = Control.SIZE_SHRINK_END; ammo_box.visible = false
 	var ar := HBoxContainer.new(); ar.add_theme_constant_override("separation", 6); ammo_box.add_child(ar)
@@ -229,3 +237,7 @@ func set_ammo(visible_: bool, text: String) -> void:
 
 func set_aim(xh: bool, hit: bool) -> void:
 	xhair.visible = xh; hitmark.visible = hit
+
+func set_speed(mph: int) -> void:
+	speedo.visible = mph >= 0
+	if mph >= 0: mph_lbl.text = str(mph)

@@ -123,6 +123,13 @@ def main(outdir):
     for i in range(10): burst(o, 'highpass', 3000 + rng.random() * 4000, gain=.35, dur=.08 + rng.random() * .15, when=i * .03)
     burst(o, 'lowpass', 400, gain=.5, dur=.4); S['shatter'] = o
     o = buf(.2); tone(o, 1100, 120, .08, .12, 0, 'square'); S['zap'] = o
+    o = buf(.9); tone(o, 55, 150, .45, .16, 0, 'sawtooth'); burst(o, 'lowpass', 280, gain=.45, dur=.45); S['engine_start'] = o
+    o = buf(.8); burst(o, 'lowpass', 500, gain=.9 * .8 + .2, dur=.4); burst(o, 'highpass', 2800, gain=.25 * .8, dur=.25, when=.03); tone(o, 110, 50, .3, .25 * .8); S['crash'] = o
+    o = buf(.6); tone(o, 392, 390, .45, .12, 0, 'square'); tone(o, 494, 492, .45, .1, 0, 'square'); S['horn'] = o
+    # engine loop at 60 Hz (game pitch-shifts it): saw + sub-octave square through a lowpass, 2 s of whole cycles
+    t = np.arange(SR * 2) / SR
+    eng = (2 * ((60 * t) % 1) - 1) + np.sign(np.sin(2 * np.pi * 30 * t))
+    S['engine_loop'] = filt(eng, 'lowpass', 700) * .09
     # loops: room tone, TV hiss, trip drone
     n = SR * 4; x = np.resize(NOISE, n)
     S['room_loop'] = filt(x, 'lowpass', 320) * .05 + filt(np.roll(x, 1234), 'bandpass', 900, 2) * .018

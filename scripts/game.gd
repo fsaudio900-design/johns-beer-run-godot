@@ -149,6 +149,9 @@ var flash_mark := 0.0
 var mirror_broken := false
 var shards: Array = []
 var hole_mat: StandardMaterial3D
+# ---- stage 5: driving the M1 ----
+var car: CharacterBody3D
+var handbrake := false
 var amb_base: Color
 var amb_energy: float
 var loaded := false
@@ -160,6 +163,8 @@ func _ready() -> void:
 	_build_tv()
 	_build_fx()
 	_build_gun()
+	car = CharacterBody3D.new(); car.set_script(load("res://scripts/car.gd")); car.name = "M1"; add_child(car)
+	car.crashed.connect(func(k): Sfx.play("crash", linear_to_db(0.35 + 0.65 * k)))
 	visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"
 	add_child(visitor); visitor.visible = false
 	menu.start_pressed.connect(start)
@@ -302,6 +307,8 @@ func _capture(on: bool) -> void:
 func reset() -> void:
 	door_target = 0; door_open = 0; front_target = 0; front_open = 0
 	visitor_reset()
+	if car: car.park(); handbrake = false
+	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false; hud.set_speed(-1)
 	gun_reset()
 	beers = 0; minutes = 23 * 60 + 12; has_beer = false; steps = 0; stock = STOCK_START; show_stock()
 	for c in floor_cans: c.queue_free()
@@ -342,8 +349,10 @@ func interact() -> void:
 		toggle_peep(false)
 		if state == "walking": front_target = 1.0; Sfx.play("creak"); Sfx.play("thunk")
 		return
+	if state == "driving": exit_car(); return
 	if state == "sitting" and tw == null: stand_up(); return
 	if state != "walking": return
+	if near_car(): enter_car(); return
 	if near_front():
 		front_target = 0.0 if front_target > 0 else 1.0
 		Sfx.play("creak")
@@ -571,6 +580,8 @@ func _input(e: InputEvent) -> void:
 	elif e is InputEventMouseButton and not e.pressed and e.button_index == MOUSE_BUTTON_RIGHT: rmb_down = false
 	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_R and armed and reload_t <= 0 and ammo < 15 and state == "walking":
 		reload_t = 1.3; Sfx.play("reload")
+	elif e is InputEventKey and e.keycode == KEY_SPACE: handbrake = e.pressed
+	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_H and state == "driving": Sfx.play("horn")
 	elif e.is_action_pressed("interact") and not e.is_echo(): interact()
 	elif e.is_action_pressed("peephole") and not e.is_echo() and state == "walking":
 		if peeping: toggle_peep(false)
@@ -580,6 +591,7 @@ func _input(e: InputEvent) -> void:
 # ------------------------------------------------------------------ frame
 func _physics_process(dt: float) -> void:
 	if not loaded: return
+	_update_car(dt)
 	if state == "walking":
 		var ix := 0.0 if peeping else Input.get_axis("move_left", "move_right"); var iz := 0.0 if peeping else Input.get_axis("move_back", "move_forward")
 		var fx := -sin(yaw); var fz := -cos(yaw); var rx := cos(yaw); var rz := -sin(yaw)
@@ -613,6 +625,7 @@ func _physics_process(dt: float) -> void:
 
 func _prompts() -> void:
 	if peeping: hud.prompt("Open the door")
+	elif near_car(): hud.prompt("Get in the car")
 	elif near_front():
 		var inside := not is_outside()
 		hud.prompt("Answer the door" if (visitor_waiting() and front_target == 0 and inside) else ("Close the front door" if front_target > 0 else "Open the front door"), true, front_target == 0 and inside)
@@ -831,6 +844,9 @@ func _update_camera(dt: float) -> void:
 		yaw = 0.35 + sin(clock_t * 0.15) * 0.25; pitch = 0.32
 	elif (state == "sitting" or state == "busy" or state == "passout") and sit > 0.5 and user_look <= 0:
 		yaw = lerp_angle(yaw, 0.0, 1.0 - exp(-dt * 1.2))
+	elif state == "driving":
+		if user_look <= 0:
+			yaw = lerp_angle(yaw, car.h + PI, 1.0 - exp(-dt * 3.2)); pitch = lerp(pitch, 0.24, 1.0 - exp(-dt * 2))
 	elif state == "walking" and user_look <= 0 and john.pose.walk > 0.3 and fwd_in:
 		yaw = lerp_angle(yaw, john.facing + PI, 1.0 - exp(-dt * 1.4))
 	if snort_obj != null or bong_active:
@@ -848,6 +864,9 @@ func _update_camera(dt: float) -> void:
 	if state == "passout" or state == "end": d = lerp(dist, 2.2, john.pose.droop)
 	elif snort_obj != null or bong_active: d = min(dist, 2.1)
 	d = lerp(d, 1.15, aim_t)
+	if state == "driving":
+		d = 6.3 + abs(car.v) * 0.04
+		tgt = car.global_position + Vector3(0, 1.3, 0)
 	var want_pos := tgt + Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * d
 	# keep the camera out of walls
 	var q := PhysicsRayQueryParameters3D.create(tgt, want_pos); q.exclude = [john.get_rid()]; q.collision_mask = 1
@@ -870,6 +889,9 @@ func _update_camera(dt: float) -> void:
 	cam.rotation.z += sin(clock_t * 0.9) * 0.09 * b + sin(clock_t * 2.3) * 0.02 * b
 	cam.fov = 55 - 14 * aim_t + sin(clock_t * 0.7) * 6 * b + 9 * hv + sin(clock_t * 11) * 0.6 * hv
 	if hv > 0: cam.global_position += Vector3((randf() - 0.5) * 0.012 * hv, (randf() - 0.5) * 0.012 * hv, 0)
+	if state == "driving":
+		cam.fov += min(12.0, abs(car.v) * 0.35)
+		if car.shake_t > 0: cam.global_position += Vector3(randf() - 0.5, randf() - 0.5, 0) * car.shake_t * 0.5
 	if peeping:
 		cam.global_position = Vector3(FD_X, 1.58, -RZ - 0.06)
 		cam.rotation = Vector3(peep_pitch - 0.05 + sin(clock_t * 0.6) * 0.02 * b, peep_yaw + sin(clock_t * 0.8) * 0.03 * b, 0)
@@ -1276,6 +1298,54 @@ func _reset_mirror() -> void:
 			for mi: MeshInstance3D in (n.BathMirror as Node).find_children("*", "MeshInstance3D", true, false): mi.create_trimesh_collision()
 			if n.BathMirror is MeshInstance3D: (n.BathMirror as MeshInstance3D).create_trimesh_collision()
 
+# ------------------------------------------------------------------ stage 5: driving
+func near_car() -> bool:
+	if car == null or state != "walking" or not is_outside(): return false
+	var l: Vector3 = car.global_transform.affine_inverse() * john.global_position
+	return abs(l.x) < 2.1 and abs(l.z) < 3.0
+
+func enter_car() -> void:
+	set_state("driving"); hud.prompt(""); Sfx.play("thunk"); rmb_down = false
+	john.visible = false; (john.get_node("Collision") as CollisionShape3D).disabled = true
+	car.set_lights(true); Sfx.play("engine_start"); user_look = 0; yaw = car.h + PI; pitch = 0.26
+	if beers >= 2: say(["Just a quick spin. I'm fine.", "I drive better like this. Probably.", "Where'd they put the steering wheel?"][min(2, beers - 2)], 2.6)
+	else: say("Let's see what she's got.", 2.6)
+
+func exit_car() -> void:
+	if abs(car.v) > 2.5: say("Whoa. Stop the car first.", 1.8); return
+	car.v = 0; car.set_lights(false); car.brake_lights(0.0); Sfx.play("thunk")
+	# step out on the driver's side (car's local +X), else the other side, else behind
+	var spot: Vector3 = car.to_world(Vector3(0, 0, -3.0))
+	for local in [Vector3(1.45, 0, 0.2), Vector3(-1.45, 0, 0.2), Vector3(0, 0, -3.0)]:
+		var w: Vector3 = car.to_world(local)
+		var q := PhysicsRayQueryParameters3D.create(car.global_position + Vector3(0, 1.0, 0), w + Vector3(0, 1.0, 0)); q.exclude = [car.get_rid()]
+		if get_world_3d().direct_space_state.intersect_ray(q).is_empty(): spot = w; break
+	john.global_position = Vector3(spot.x, car.global_position.y + 0.1, spot.z); john.facing = car.h; john.velocity = Vector3.ZERO
+	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false
+	hud.set_speed(-1); set_state("walking")
+
+func _update_car(dt: float) -> void:
+	if car == null: return
+	var driving := state == "driving"
+	var thr := 0.0; var back := 0.0; var st := 0.0
+	if driving:
+		thr = 1.0 if Input.is_action_pressed("move_forward") else 0.0
+		back = 1.0 if Input.is_action_pressed("move_back") else 0.0
+		st = (1.0 if Input.is_action_pressed("move_left") else 0.0) - (1.0 if Input.is_action_pressed("move_right") else 0.0)
+	car.drive(dt, driving, thr, back, st, handbrake, drunk_level(), boost_t > 0, clock_t)
+	# the visitor is solid to the car (he is still invincible)
+	if visitor and visitor.visible:
+		var d := Vector2(car.global_position.x - visitor.global_position.x, car.global_position.z - visitor.global_position.z)
+		if d.length() < 1.6 and d.length() > 0.01:
+			var push := d.normalized() * (1.6 - d.length())
+			car.global_position += Vector3(push.x, 0, push.y)
+			if abs(car.v) > 0.5: car.v *= -0.25
+	Sfx.engine(driving, abs(car.v), thr, dt)
+	if driving:
+		john.global_position = car.global_position; john.facing = car.h
+		hud.set_speed(int(round(abs(car.v) * 2.237)))
+		hud.prompt("Get out of the car")
+
 # ------------------------------------------------------------------ test driver
 ## godot -- --scenario=tour --shots=/tmp/x   walks through the cabin actions and saves frames
 var debug_run := false
@@ -1369,6 +1439,24 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		await _wait_sim(1.5); await _shot(prefix, "2_circle")
 		set_pos2(-70.0, -27.0); john.facing = -PI / 2; yaw = PI / 2 + 0.6; pitch = 0.2
 		await _wait_sim(1.5); await _shot(prefix, "3_mainstreet")
+		get_tree().quit(); return
+	if sc == "drive":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		var near: Vector3 = car.to_world(Vector3(1.6, 0, 0)); set_pos2(near.x, near.z); john.global_position.y = car.global_position.y + 0.1
+		await _wait_sim(0.5); await _shot(prefix, "1_by_car")
+		interact(); await _wait_sim(0.5)
+		Input.action_press("move_forward"); await _wait_sim(2.0)
+		await _shot(prefix, "2_driving")
+		Input.action_press("move_left"); await _wait_sim(1.2); Input.action_release("move_left")
+		await _wait_sim(1.5)
+		await _shot(prefix, "3_turning")
+		Input.action_release("move_forward"); Input.action_press("move_back"); await _wait_sim(2.0); Input.action_release("move_back")
+		Input.action_press("move_forward"); await _wait_sim(0.45); Input.action_release("move_forward"); await _wait_sim(0.5)
+		print("[drive] speed ", car.v, " at ", car.global_position)
+		await _wait_sim(1.0)
+		interact(); await _wait_sim(0.5)
+		print("[drive] state after exit ", state, " john ", john.global_position)
+		await _shot(prefix, "4_out")
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return

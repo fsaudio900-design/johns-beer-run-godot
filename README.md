@@ -1,4 +1,4 @@
-# John's Beer Run: Godot 4.3 port (v2.4, stage 4)
+# John's Beer Run: Godot 4.3 port (v2.5, stage 5)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
 
@@ -37,6 +37,13 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
   - Shooting the bathroom mirror shatters it into falling shards.
   - Shooting the TV shatters the screen with sparks and ends in MISSION FAILED.
   - The gun is put away while John does a line or hits the bong.
+- **Driving the M1 (stage 5):**
+  - The red BMW M1 is parked in the cul-de-sac. Press E next to it to get in, and E again to get out (you have to stop first).
+  - W is gas, S is brake and then reverse, A/D steer, Space is the handbrake (slides), H is the horn.
+  - Steering tightens up at speed. While "wired" the top speed goes up. When drunk the steering wanders and reacts late.
+  - Crashes thump, shake the camera and bounce the car back. The visitor is solid to the car and still can't be hurt.
+  - Headlights come on when you get in, and the brake lights glow when braking. The engine note revs through 4 gears.
+  - The chase camera pulls back and widens with speed, and there's a speedometer on the HUD.
 - **Character models:** the visitor, Dale the clerk and the officer are exported from the web game (`assets/chars`). The clerk and officer are already in place for stages 6 and 7.
 
 ## Controls
@@ -47,6 +54,7 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
 - **Right mouse button:** aim (once John has the gun).
 - **Left mouse button:** shoot.
 - **R:** reload.
+- **In the car:** W gas, S brake/reverse, A/D steer, Space handbrake, H horn, E get out.
 - **Esc:** free the mouse. Click to capture it again.
 
 ## Project layout
@@ -58,10 +66,9 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
 - `tools/glb_jpeg.py`: shrinks the textures inside the world files.
 
 ## Test run
-`godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`) plays through the actions and saves screenshots.
+`godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`, `--scenario=drive`, `--scenario=outside`) plays through the actions and saves screenshots.
 
 ## Next stages
-5. Driving the M1.
 6. The Fuel Stop: the clerk, buying beer, money, the trunk, stocking the fridge and the robbery.
 7. The police.
 8. The pause menu and a Windows export.
