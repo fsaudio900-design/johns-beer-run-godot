@@ -1,7 +1,7 @@
 extends Node
-## Stage 6: the Fuel Stop. Money, Dale the clerk, buying a case of Lumberjack, carrying it,
+## Stage 6: the Fuel Stop. Money, the clerk, buying a case of Lumberjack, carrying it,
 ## the M1's trunk, stocking the fridge, and the robbery (hands up, demand the cash, shoot
-## Dale: hit reactions by body part, blood, a physics ragdoll, robbing the till yourself).
+## The clerk: hit reactions by body part, blood, a physics ragdoll, robbing the till yourself).
 ## Ported from the web build's BEER / ROB / RAG / BLOOD systems.
 
 const START_CASH := 500.0
@@ -37,7 +37,7 @@ var drawer: Node3D
 var drawer_cash: Node3D
 var drawer_z0 := 0.0
 var till_open := 0.0
-# Dale
+# the clerk
 var clerk: Node3D
 var clerk_block: StaticBody3D
 var rob := {clerk = "idle", till = true, wanted = 0.0, groan_t = 0.0, hits = 0, drip_t = 0.0}
@@ -147,8 +147,9 @@ func _spawn_clerk() -> void:
 	for c in g.get_children():
 		if c is ConeTwistJoint3D: c.queue_free()
 	if clerk: clerk.queue_free()
-	clerk = Node3D.new(); clerk.set_script(load("res://scripts/visitor.gd")); clerk.name = "Dale"
+	clerk = Node3D.new(); clerk.set_script(load("res://scripts/visitor.gd")); clerk.name = "Clerk"
 	clerk.set("model_path", "res://assets/chars/Clerk.glb")
+	clerk.set("skin_path", "res://assets/chars/Cashier.glb")
 	g.add_child(clerk); clerk.global_position = CLERK_POS; clerk.rotation.y = PI
 	if clerk_block == null:
 		clerk_block = StaticBody3D.new(); clerk_block.name = "BehindCounterBlock"; g.add_child(clerk_block)
@@ -285,10 +286,10 @@ func open_till() -> void:
 			if drawer_cash: drawer_cash.visible = false
 	var done := func():
 		g.john.snort_ik.w = 0.0; g.set_state("walking")
-		say(["Don't mind if I do.", "Thanks, Dale.", "Payday."].pick_random(), 2.2)
+		say(["Don't mind if I do.", "Thanks, ma'am.", "Payday."].pick_random(), 2.2)
 	g.tween(2.6, fn, done)
 
-## hit test against Dale's current pose (head sphere, torso capsule, arms, legs)
+## hit test against the clerk's current pose (head sphere, torso capsule, arms, legs)
 func clerk_ray_hit(from: Vector3, dir: Vector3, max_d: float) -> Dictionary:
 	if clerk == null or rob.clerk == "dead": return {}
 	var J: Dictionary = clerk.J
@@ -317,7 +318,7 @@ func _seg(ro: Vector3, rd: Vector3, a: Vector3, b: Vector3) -> Dictionary:
 		if d < best: best = d; bt = t
 	return {d = best, t = bt}
 
-## called by fire(): returns true when the bullet hit Dale (then no bullet hole is made)
+## called by fire(): returns true when the bullet hit the clerk (then no bullet hole is made)
 func on_shot(from: Vector3, dir: Vector3, hit: Dictionary) -> bool:
 	var point_d: float = from.distance_to(hit.position) if hit else 30.0
 	# the ragdoll is a physics body now: shooting it bleeds and shoves it
@@ -356,6 +357,7 @@ func shoot_clerk(h: Dictionary, p: Vector3, dir: Vector3) -> void:
 func _go_ragdoll(part: String, impulse: Vector3) -> void:
 	(clerk_block.get_child(0) as CollisionShape3D).disabled = true      # John can step behind the counter now
 	rag = Ragdoll.build(g, clerk.J, part, impulse)
+	if clerk.skin: clerk.skin.follow_ragdoll(rag)
 	clerk.set_process(false); clerk.visible = true
 	rag_t = 0.0; pool_t = 0.0
 	later(0.6, func(): Sfx.play("thud"))
@@ -365,7 +367,7 @@ func _wound(part: String, p: Vector3, dir: Vector3) -> void:
 	var jn := {head = "head", torso = "spine", armL = "shL", armR = "shR", thighL = "thighL", thighR = "thighR"}.get(part, "spine")
 	var j: Node3D = clerk.J.get(jn)
 	var host: Node3D = j
-	if j:
+	if j and clerk.skin == null:
 		for c in j.get_children():
 			if c is MeshInstance3D: host = c; break
 	if host == null: return

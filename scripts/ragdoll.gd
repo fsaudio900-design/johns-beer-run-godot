@@ -1,6 +1,6 @@
 extends RefCounted
 class_name Ragdoll
-## Turns one of the procedural "visitor" rigs (Dale, the officer) into a physics ragdoll:
+## Turns one of the procedural "visitor" rigs (the clerk, the officers) into a physics ragdoll:
 ## each body part becomes a RigidBody3D with a capsule collider, joined by cone-twist joints,
 ## and the part's meshes are moved onto it. Replaces the web build's scripted fall.
 

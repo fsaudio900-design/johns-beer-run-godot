@@ -6,6 +6,8 @@ extends Node3D
 ## The visitor himself is invincible: he is never added to any shootable group.
 
 @export var model_path := "res://assets/chars/Visitor.glb"
+@export var skin_path := ""          # optional skinned character worn over the procedural rig
+var skin: SkinDriver
 var J := {}
 var anim := "idle"
 var t := 0.0
@@ -23,6 +25,8 @@ func _ready() -> void:
 	print("[visitor] ", model_path.get_file(), " joints ", J.size())
 	for mi: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	if skin_path != "":
+		skin = SkinDriver.new(); skin.name = "Skin"; add_child(skin); skin.setup(self, skin_path)
 
 func set_anim(a: String) -> void:
 	if a == "knock" and anim != "knock": k_t = -0.5

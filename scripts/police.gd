@@ -225,6 +225,7 @@ func _drive(c: Dictionary, dt: float) -> void:
 func _deploy(c: Dictionary) -> void:
 	var o := Node3D.new(); o.set_script(load("res://scripts/visitor.gd")); o.name = "Officer"
 	o.set("model_path", "res://assets/chars/Officer.glb")
+	o.set("skin_path", "res://assets/chars/Police.glb")
 	g.add_child(o)
 	var side = c.body.global_transform * Vector3(1.4, 0, 0.3)
 	o.global_position = _closest(side, FOOT_LAYER); o.rotation.y = c.h

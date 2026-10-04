@@ -8,7 +8,7 @@ signal menu_pressed
 signal retry_pressed
 signal pause_action(act: String)
 
-const VERSION := "v2.9"
+const VERSION := "v2.10"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")
@@ -105,7 +105,8 @@ func _build_title() -> void:
 		["", "Five beers and John is out for the night."]])
 	panels.credits = _panel(right, "Credits", [
 		["A game by", "Cessna"], ["Created and directed by", "Cessna"], ["Game design", "Cessna"],
-		["Starring", "John, as himself"], ["Engine", "Godot 4"], ["", "No televisions were harmed in the making of this game."]])
+		["Starring", "John, as himself"], ["Engine", "Godot 4"],
+		["Cashier model", "\"Cashier Lady\" by nur in (sketchfab.com/mochi16), CC BY 4.0"], ["Police model", "Police with sunglasses (Adobe Fuse character)"], ["", "No televisions were harmed in the making of this game."]])
 
 	var foot := HBoxContainer.new(); foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE); foot.position.y = -36
 	foot.offset_left = 96; foot.offset_right = -96; foot.offset_top = -40; foot.offset_bottom = -16

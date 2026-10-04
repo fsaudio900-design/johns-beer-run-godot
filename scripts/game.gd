@@ -1549,6 +1549,40 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		print("[drive] state after exit ", state, " john ", john.global_position)
 		await _shot(prefix, "4_out")
 		get_tree().quit(); return
+	if sc == "chars":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(-50.5, -47.0); john.global_position.y = -0.3
+		var o := Node3D.new(); o.set_script(load("res://scripts/visitor.gd"))
+		o.set("model_path", "res://assets/chars/Officer.glb"); o.set("skin_path", "res://assets/chars/Police.glb")
+		add_child(o); o.global_position = Vector3(-49.2, -0.33, -45.6); o.rotation.y = PI * 0.8
+		await _wait_sim(0.3)
+		debug_cam = {pos = Vector3(-47.4, 1.35, -45.9), at = Vector3(-47.4, 0.85, -43.9)}
+		await _wait_sim(0.2); await _shot(prefix, "c1_cashier")
+		await _wait_sim(3.0)
+		debug_cam = {pos = Vector3(-46.3, 1.45, -44.9), at = Vector3(-47.4, 0.9, -43.9)}
+		await _wait_sim(0.1); await _shot(prefix, "c1b_cashier_side")
+		debug_cam = {pos = Vector3(-49.2, 1.2, -47.6), at = Vector3(-49.2, 0.9, -45.6)}
+		await _wait_sim(0.1); await _shot(prefix, "c2_police_idle")
+		o.set_anim("walk")
+		for k in 12: o.pose(0.03); await _wait_sim(0.03)
+		await _shot(prefix, "c3_police_walk")
+		o.set_anim("hands")
+		for k in 40: o.pose(0.03); await _wait_sim(0.03)
+		await _shot(prefix, "c4_police_hands")
+		store.hands_up(); await _wait_sim(1.5)
+		debug_cam = {pos = Vector3(-47.4, 1.35, -45.9), at = Vector3(-47.4, 0.85, -43.9)}
+		await _wait_sim(0.1); await _shot(prefix, "c5_cashier_hands")
+		var J: Dictionary = store.clerk.J
+		var from := Vector3(-47.4, 1.3, -46.0)
+		var lg: Vector3 = (J.thighL as Node3D).global_position.lerp((J.kneeL as Node3D).global_position, 0.5)
+		store.shoot_clerk({zone = "leg", t = 0, part = "thighL", side = "L"}, lg, (lg - from).normalized())
+		await _wait_sim(1.2); await _shot(prefix, "c6_cashier_kneel")
+		var hd: Vector3 = (J.head as Node3D).global_position
+		store.shoot_clerk({zone = "head", t = 0, part = "head"}, hd, (hd - from).normalized())
+		await _wait_sim(3.0)
+		debug_cam = {pos = Vector3(-46.6, 1.9, -44.4), at = Vector3(-47.6, -0.3, -43.6)}
+		await _wait_sim(0.1); await _shot(prefix, "c7_cashier_ragdoll")
+		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
 		set_pos2(-57.4, -49.6); john.global_position.y = -0.3
