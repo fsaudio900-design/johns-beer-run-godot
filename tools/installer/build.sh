@@ -3,7 +3,7 @@
 #   tools/installer/build.sh <version> <path/to/JohnsBeerRun.exe> <out dir>
 # Needs Go 1.22+ and Python 3. Works on Linux, macOS or Windows (Git Bash) and in GitHub Actions.
 set -euo pipefail
-VER="$1"; GAME="$2"; OUT="$3"
+VER="$1"; GAME="$2"; OUT="$(mkdir -p "$3" && cd "$3" && pwd)"
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"
 mkdir -p "$OUT"
 cp "$GAME" "$HERE/setup/JohnsBeerRun.exe"
