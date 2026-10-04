@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>John's Beer Run Setup</title>
+<link rel="icon" href="{{ICON}}">
+{{FONTS}}
+<style>
+:root{
+  --night:#0c0908;--ink:#f4e8d4;--muted:#bba78c;--ember:#ff8a3d;--ember-deep:#c4521c;
+  --panel:rgba(20,14,10,.9);--line:rgba(244,232,212,.16);--ok:#9fd39a;--warn:#ffcf6b;--bad:#ff7a6b;
+  --display:"Alfa Slab One","Rockwell",Georgia,serif;--sign:"Rye","Alfa Slab One",Georgia,serif;
+  --body:"Archivo",system-ui,"Segoe UI",sans-serif;color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--night);color:var(--ink);font-family:var(--body);overflow:hidden;user-select:none}
+.bg{position:fixed;inset:0;background:url({{ART}}) center/cover no-repeat;filter:saturate(1.05)}
+.bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(9,6,5,.96) 0,rgba(9,6,5,.86) 40%,rgba(9,6,5,.55) 70%,rgba(9,6,5,.7) 100%)}
+.wrap{position:relative;height:100%;display:grid;grid-template-columns:1fr 400px;gap:36px;align-items:center;padding:32px 40px 54px}
+.logo{display:flex;flex-direction:column;gap:4px}
+.presents{font-size:11px;font-weight:800;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px}
+.presents::before{content:"";width:28px;height:2px;background:var(--ember)}
+.johns{font-family:var(--sign);font-size:74px;line-height:.9;color:var(--ink);text-shadow:0 3px 0 #2a1408,0 0 26px rgba(255,138,61,.25);margin-top:10px}
+.run{font-family:var(--display);font-size:66px;line-height:.92;color:var(--ember);text-shadow:0 4px 0 var(--ember-deep),0 0 34px rgba(255,138,61,.45);animation:neon 7s infinite}
+@keyframes neon{0%,93%,100%{opacity:1}94%{opacity:.55}95%{opacity:1}96.5%{opacity:.7}97%{opacity:1}}
+.stripe{display:flex;height:8px;width:280px;margin-top:14px;border-radius:2px;overflow:hidden}
+.stripe i{flex:1}.stripe i:nth-child(1){background:var(--ember)}.stripe i:nth-child(2){background:var(--ink)}.stripe i:nth-child(3){background:var(--ember-deep)}
+.setup-tag{margin-top:18px;display:inline-flex;gap:10px;align-items:center;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.setup-tag b{color:var(--ink);font-weight:800}
+.ver{border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ember)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 26px 22px;box-shadow:0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(6px);min-height:330px;display:flex;flex-direction:column}
+.card h1{font-family:var(--display);font-weight:400;font-size:26px;line-height:1.05;margin:0 0 10px}
+.card p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.5}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:6px 10px;border-radius:8px;margin-bottom:14px;align-self:flex-start}
+.badge.ok{background:rgba(159,211,154,.12);color:var(--ok)}.badge.warn{background:rgba(255,207,107,.12);color:var(--warn)}.badge.bad{background:rgba(255,122,107,.12);color:var(--bad)}
+.badge::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.vers{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px}
+.vers dt{color:var(--muted)}.vers dd{margin:0;font-weight:700}
+.path{font:12px ui-monospace,Consolas,monospace;color:var(--ink);background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0 0 14px;word-break:break-all}
+.lbl{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.opts{display:flex;flex-direction:column;gap:8px;margin:0 0 6px}
+.opt{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+.opt input{appearance:none;width:18px;height:18px;border:1.5px solid var(--muted);border-radius:4px;display:grid;place-items:center;margin:0;cursor:pointer}
+.opt input:checked{background:var(--ember);border-color:var(--ember)}
+.opt input:checked::after{content:"";width:5px;height:9px;border:solid #1a0d05;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.opt input:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.spacer{flex:1}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+button{appearance:none;font:800 14px var(--body);letter-spacing:.04em;border-radius:10px;padding:11px 18px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);transition:background .15s,border-color .15s,color .15s,transform .1s}
+button:hover{border-color:var(--ember);color:var(--ember)}
+button:active{transform:translateY(1px)}
+button.primary{background:var(--ember);border-color:var(--ember);color:#1a0d05;box-shadow:0 3px 0 var(--ember-deep)}
+button.primary:hover{background:#ff9c5a;color:#1a0d05}
+button.danger:hover{border-color:var(--bad);color:var(--bad)}
+button.link{border:none;padding:11px 6px;color:var(--muted)}
+button.link:hover{color:var(--ink)}
+button[disabled]{opacity:.45;pointer-events:none}
+.bar{height:12px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 10px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember-deep),var(--ember));border-radius:inherit;transition:width .25s}
+.step{font-size:13px;color:var(--muted);min-height:20px}
+.pct{font-family:var(--display);font-size:40px;color:var(--ember);line-height:1;margin:6px 0 4px}
+.note{font-size:12px;color:var(--warn);margin:-4px 0 12px}
+.err{font-size:13px;color:var(--bad);background:rgba(255,122,107,.08);border:1px solid rgba(255,122,107,.25);border-radius:8px;padding:10px 12px;margin:0 0 12px;word-break:break-word}
+footer{position:fixed;left:40px;right:40px;bottom:16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+footer b{color:var(--ink)}
+.screen{display:none;flex:1;flex-direction:column}.screen.on{display:flex}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="wrap">
+  <div class="logo">
+    <div class="presents">Cessna presents</div>
+    <div class="johns">John's</div>
+    <div class="run">Beer Run</div>
+    <div class="stripe"><i></i><i></i><i></i></div>
+    <div class="setup-tag"><b id="modeTag">Setup</b><span class="ver">v{{VERSION}}</span></div>
+  </div>
+
+  <div class="card" aria-live="polite">
+    <section class="screen on" id="s-loading"><h1>One sec…</h1><p>Checking this PC for John's Beer Run.</p></section>
+
+    <!-- fresh install -->
+    <section class="screen" id="s-fresh">
+      <h1>Install John's Beer Run</h1>
+      <p>Version {{VERSION}} installs for your Windows account. No admin rights needed, and it runs fully offline.</p>
+      <div class="lbl">Install location</div>
+      <div class="path" data-dir></div>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" data-opt="desktop" checked>Desktop shortcut</label>
+        <label class="opt"><input type="checkbox" data-opt="startMenu" checked>Start menu shortcut</label>
+      </div>
+      <div class="spacer"></div>
+      <div class="btns"><button class="primary" data-act="install">Install</button><button class="link" data-act="quit">Cancel</button></div>
+    </section>
+
+    <!-- already installed -->
+    <section class="screen" id="s-installed">
+      <div class="badge" id="instBadge">Already installed</div>
+      <h1 id="instTitle">John's Beer Run is already installed</h1>
+      <dl class="vers"><dt>Installed</dt><dd id="vOld"></dd><dt>This setup</dt><dd>v{{VERSION}}</dd><dt>Location</dt><dd class="path" style="margin:0;padding:4px 8px" data-dir></dd></dl>
+      <p id="instText"></p>
+      <div class="note" id="runNote" hidden>The game is running. Setup will close it first.</div>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" data-opt="desktop" checked>Desktop shortcut</label>
+        <label class="opt"><input type="checkbox" data-opt="startMenu" checked>Start menu shortcut</label>
+      </div>
+      <div class="spacer"></div>
+      <div class="btns">
+        <button class="primary" data-act="install" id="replaceBtn">Replace</button>
+        <button data-act="launch">Play installed</button>
+        <button class="danger" data-act="uninstall-ask">Uninstall</button>
+        <button class="link" data-act="quit">Cancel</button>
+      </div>
+    </section>
+
+    <!-- uninstall confirm (from Settings > Apps or the Uninstall button) -->
+    <section class="screen" id="s-uninstall">
+      <div class="badge bad">Uninstall</div>
+      <h1>Remove John's Beer Run?</h1>
+      <p>This deletes the game, its shortcuts and its entry in Settings&nbsp;›&nbsp;Apps.</p>
+      <div class="lbl">Installed in</div>
+      <div class="path" data-dir></div>
+      <div class="note" data-run hidden>The game is running. It will be closed.</div>
+      <div class="spacer"></div>
+      <div class="btns"><button class="primary" data-act="uninstall">Uninstall</button><button class="link" data-act="back" id="uninstBack">Cancel</button></div>
+    </section>
+
+    <!-- working -->
+    <section class="screen" id="s-work">
+      <h1 id="workTitle">Installing…</h1>
+      <div class="pct" id="pct">0%</div>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="step" id="step">Starting…</div>
+      <div class="spacer"></div>
+      <p style="margin:12px 0 0;font-size:12px">Please keep this window open.</p>
+    </section>
+
+    <!-- done -->
+    <section class="screen" id="s-done">
+      <div class="badge ok" id="doneBadge">Installed</div>
+      <h1 id="doneTitle">John's Beer Run is ready</h1>
+      <p id="doneText"></p>
+      <div class="spacer"></div>
+      <div class="btns" id="doneBtns"><button class="primary" data-act="launch">Play now</button><button data-act="quit">Close</button></div>
+    </section>
+
+    <!-- error -->
+    <section class="screen" id="s-error">
+      <div class="badge bad">Something went wrong</div>
+      <h1>Setup couldn't finish</h1>
+      <div class="err" id="errText"></div>
+      <p>Close the game if it's open and try again.</p>
+      <div class="spacer"></div>
+      <div class="btns"><button class="primary" data-act="retry">Try again</button><button class="link" data-act="quit">Close</button></div>
+    </section>
+  </div>
+</div>
+<footer><span>Created by <b>Cessna</b></span><span>John's Beer Run · v{{VERSION}}</span></footer>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const api=(p,body)=>fetch(p,body===undefined?{cache:'no-store'}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+let st=null,lastJob=null,backTo='s-installed';
+setInterval(()=>api('ping').catch(()=>{}),1000);api('ping').catch(()=>{});
+
+function show(id){$$('.screen').forEach(s=>s.classList.toggle('on',s.id===id));const f=$('#'+id+' button.primary')||$('#'+id+' button');if(f)setTimeout(()=>f.focus(),30);}
+function opts(scope){const o={};$$('#'+scope+' [data-opt]').forEach(i=>o[i.dataset.opt]=i.checked);return o;}
+
+function render(){
+  $$('[data-dir]').forEach(e=>e.textContent=st.dir);
+  $$('[data-run]').forEach(e=>e.hidden=!st.running);
+  if(st.mode==='uninstall'){
+    $('#modeTag').textContent='Uninstall';document.title="Uninstall John's Beer Run";backTo=null;
+    $('#uninstBack').textContent='Cancel';$('#uninstBack').dataset.act='quit';
+    if(!st.installed){$('#doneBadge').className='badge ok';$('#doneBadge').textContent='Nothing to remove';$('#doneTitle').textContent="John's Beer Run isn't installed";$('#doneText').textContent='There is nothing to uninstall on this PC.';
+      $('#doneBtns').innerHTML='<button class="primary" data-act="quit">Close</button>';show('s-done');return;}
+    show('s-uninstall');return;}
+  // shortcut checkboxes mirror what's there now when replacing
+  if(st.installed){$$('#s-installed [data-opt="desktop"]').forEach(i=>i.checked=st.hasDesktop||!st.hasStartMenu);$$('#s-installed [data-opt="startMenu"]').forEach(i=>i.checked=st.hasStartMenu||!st.hasDesktop);}
+  if(!st.installed){show('s-fresh');return;}
+  const old=st.installedVersion==='unknown'?'unknown version':'v'+st.installedVersion;
+  $('#vOld').textContent=old;$('#runNote').hidden=!st.running;
+  const b=$('#instBadge'),t=$('#instText'),r=$('#replaceBtn');
+  if(st.cmp===-1){b.className='badge warn';b.textContent='Update available';$('#instTitle').textContent='Update to v'+st.newVersion+'?';
+    t.textContent='An older version is installed. Replace it with v'+st.newVersion+'. Shortcuts and the Settings › Apps entry are updated in place.';r.textContent='Update to v'+st.newVersion;}
+  else if(st.cmp===0){b.className='badge ok';b.textContent='Up to date';$('#instTitle').textContent='v'+st.newVersion+' is already installed';
+    t.textContent='You already have this version. You can reinstall it to repair the files or change shortcuts.';r.textContent='Reinstall v'+st.newVersion;}
+  else if(st.cmp===1){b.className='badge bad';b.textContent='Newer version installed';$('#instTitle').textContent='A newer version is installed';
+    t.textContent='The installed copy ('+old+') is newer than this setup. Replacing it rolls the game back to v'+st.newVersion+'.';r.textContent='Replace with v'+st.newVersion;}
+  else{b.className='badge warn';b.textContent='Already installed';$('#instTitle').textContent="John's Beer Run is already installed";
+    t.textContent="Setup couldn't tell which version is installed. Replace it with v"+st.newVersion+'.';r.textContent='Replace with v'+st.newVersion;}
+  show('s-installed');}
+
+function poll(kind){api('progress').then(r=>r.json()).then(p=>{
+    $('#pct').textContent=p.pct+'%';$('#barFill').style.width=p.pct+'%';$('#step').textContent=p.msg||'';
+    if(!p.done){setTimeout(()=>poll(kind),200);return;}
+    if(p.err){$('#errText').textContent=p.err;show('s-error');return;}
+    setTimeout(()=>done(kind),350);}).catch(()=>setTimeout(()=>poll(kind),400));}
+function done(kind){
+  if(kind==='uninstall'){$('#doneBadge').className='badge ok';$('#doneBadge').textContent='Removed';$('#doneTitle').textContent="John's Beer Run has been removed";
+    $('#doneText').textContent='Thanks for playing. John is still in his recliner somewhere.';$('#doneBtns').innerHTML='<button class="primary" data-act="quit">Close</button>';show('s-done');return;}
+  const was=st&&st.installed?(st.cmp===-1?'Updated':st.cmp===0?'Reinstalled':'Replaced'):'Installed';
+  $('#doneBadge').className='badge ok';$('#doneBadge').textContent=was;$('#doneTitle').textContent="v"+(st?st.newVersion:'')+" is ready";
+  const o=lastJob||{};const where=[o.desktop&&'your desktop',o.startMenu&&'the Start menu'].filter(Boolean);
+  $('#doneText').textContent=where.length?"You'll find John's Beer Run on "+where.join(' and ')+'. Press Alt+F4 in the game to quit.':'Press Alt+F4 in the game to quit.';
+  $('#doneBtns').innerHTML='<button class="primary" data-act="launch">Play now</button><button data-act="quit">Close</button>';show('s-done');}
+function run(kind,body){lastJob=body;$('#workTitle').textContent=kind==='uninstall'?'Uninstalling…':st&&st.installed?(st.cmp===-1?'Updating…':'Replacing…'):'Installing…';
+  $('#pct').textContent='0%';$('#barFill').style.width='0';$('#step').textContent='Starting…';show('s-work');
+  api(kind,body||{}).then(r=>{if(!r.ok&&r.status!==409)throw new Error('HTTP '+r.status);poll(kind);}).catch(e=>{$('#errText').textContent=String(e.message||e);show('s-error');});}
+
+let lastKind='install';
+document.addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='install'){lastKind='install';const scope=$('#s-installed').classList.contains('on')?'s-installed':'s-fresh';run('install',opts(scope));}
+  else if(a==='uninstall-ask'){backTo='s-installed';show('s-uninstall');}
+  else if(a==='uninstall'){lastKind='uninstall';run('uninstall');}
+  else if(a==='back'){if(backTo)show(backTo);}
+  else if(a==='retry'){refresh();}
+  else if(a==='launch'){b.disabled=true;api('launch',{}).finally(()=>setTimeout(()=>window.close(),150));}
+  else if(a==='quit'){api('quit',{}).finally(()=>setTimeout(()=>window.close(),150));}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){const back=$('.screen.on [data-act="back"]')||$('.screen.on [data-act="quit"]');if(back&&!$('#s-work').classList.contains('on'))back.click();}});
+function refresh(){show('s-loading');api('state').then(r=>r.json()).then(s=>{st=s;render();}).catch(e=>{$('#errText').textContent='Setup lost contact with its helper process. Run it again.';show('s-error');});}
+refresh();
+})();
+</script>
+</body>
+</html>

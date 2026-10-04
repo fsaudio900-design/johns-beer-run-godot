@@ -10,3 +10,10 @@ assets/chars/*_[0-9]*.png
 assets/chars/*_[0-9]*.jpg
 assets/chars/*_[0-9]*.png.import
 assets/chars/*_[0-9]*.jpg.import
+
+# exported builds
+build/
+tools/installer/setup/JohnsBeerRun.exe
+tools/installer/setup/ui.html
+tools/installer/setup/*.syso
+tools/installer/setup/game.ico

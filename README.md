@@ -1,6 +1,11 @@
-# John's Beer Run: Godot 4.3 port (v2.8, stage 7)
+# John's Beer Run: Godot 4.3 port (v2.9, stage 8, complete)
 
 To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, choose Import and select `project.godot`. The first time, Godot spends a minute or two importing the assets. Then press F5.
+
+## Playing on Windows (no Godot needed)
+Each release on GitHub has:
+- **JohnsBeerRun-Setup-vX.Y.exe**, the installer. It installs for your Windows account with no admin rights, adds Start menu and desktop shortcuts, and appears in Settings → Apps. It replaces the old web-version install.
+- **JohnsBeerRun-Windows-vX.Y.zip**, the game as a single .exe. Unzip it and run it, no install needed.
 
 ## What works
 - **Title screen:** the logo, Start the Night, How to Play and Credits.
@@ -63,6 +68,10 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
   - **In the car:** if a cruiser boxes in the M1 while it's going slowly, John is pulled out and arrested.
   - **Getting caught** means BUSTED.
   - **3D sirens:** every cruiser has its own siren that comes from its direction and doppler-shifts as it passes. The red and blue lights wash over the houses.
+- **Pause menu and Windows build (stage 8):**
+  - Esc (or P, or switching away from the window) pauses the game, freezes everything and mutes the sound.
+  - The menu has Continue, Restart, Exit to Main Menu and Exit to Desktop. The last three ask "Select again" to confirm, like the web version.
+  - Every release automatically builds the Windows game and its installer on GitHub.
 - **Character models:** the visitor, Dale the clerk and the officer are exported from the web game (`assets/chars`). The clerk and officer are already in place for stages 6 and 7.
 
 ## Controls
@@ -74,7 +83,7 @@ To run it, open this folder in **Godot 4.3 or newer**: in the Project Manager, c
 - **Left mouse button:** shoot.
 - **R:** reload.
 - **In the car:** W gas, S brake/reverse, A/D steer, Space handbrake, H horn, E get out.
-- **Esc:** free the mouse. Click to capture it again.
+- **Esc / P:** pause menu.
 
 ## Editing in the Godot editor
 Open `scenes/main.tscn`. Everything is placed in the scene, so you can see it and move it:
@@ -98,5 +107,5 @@ A few things are still set up when the game starts and only show up when you pre
 ## Test run
 `godot -- --scenario=tour --shots=/tmp/t` (or `--scenario=visitor`, `--scenario=gun`, `--scenario=drive`, `--scenario=outside`, `--scenario=store`, `--scenario=rob`, `--scenario=police`, `--scenario=hide`) plays through the actions and saves screenshots.
 
-## Next stages
-8. The pause menu and a Windows export.
+## Next steps
+The port is complete. Ideas for what to build next: motion-capture animation, weather, more buildings you can go into, controller support, save games and a settings menu.

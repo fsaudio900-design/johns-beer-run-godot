@@ -6,8 +6,9 @@ signal start_pressed
 signal again_pressed
 signal menu_pressed
 signal retry_pressed
+signal pause_action(act: String)
 
-const VERSION := "v2.8"
+const VERSION := "v2.9"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")
@@ -41,6 +42,7 @@ func _ready() -> void:
 	_build_title()
 	_build_card()
 	_build_failed()
+	_build_pause()
 	show_title()
 
 func _l(text: String, font: Font, size: int, col: Color) -> Label:
@@ -202,6 +204,72 @@ func show_failed(why: String, title := "MISSION FAILED") -> void:
 	visible = true; title_root.visible = false; card_root.visible = false; failed_root.visible = true
 	failed_why.text = why; failed_title.text = title
 
+# ---------------------------------------------------------------- pause menu
+const P_LABEL := {"continue": "Continue", "restart": "Restart", "menu": "Exit to Main Menu", "desktop": "Exit to Desktop"}
+const P_CONFIRM := {"restart": "Restart the night? Select again", "menu": "Leave to the menu? Select again", "desktop": "Quit the game? Select again"}
+var pause_root: Control
+var p_buttons: Array[Button] = []
+var p_sel := 0
+var p_confirm := ""
+
+func _build_pause() -> void:
+	pause_root = Control.new(); pause_root.set_anchors_preset(Control.PRESET_FULL_RECT); add_child(pause_root)
+	var bg := TextureRect.new(); bg.set_anchors_preset(Control.PRESET_FULL_RECT); bg.stretch_mode = TextureRect.STRETCH_SCALE
+	var gt := GradientTexture2D.new(); gt.fill = GradientTexture2D.FILL_RADIAL; gt.fill_from = Vector2(0.3, 0.5); gt.fill_to = Vector2(1.1, 0.5)
+	var gr := Gradient.new(); gr.set_color(0, Color(12 / 255.0, 9 / 255.0, 8 / 255.0, 0.72)); gr.set_color(1, Color(6 / 255.0, 4 / 255.0, 3 / 255.0, 0.9))
+	gt.gradient = gr; bg.texture = gt; pause_root.add_child(bg)
+	var cc := CenterContainer.new(); cc.set_anchors_preset(Control.PRESET_FULL_RECT); pause_root.add_child(cc)
+	var col := VBoxContainer.new(); col.add_theme_constant_override("separation", 6); col.custom_minimum_size = Vector2(420, 0); cc.add_child(col)
+	col.add_child(_shadowed(_l("Paused", f_display, 72, EMBER), EMBER_DEEP, 4))
+	var sub := HBoxContainer.new(); sub.add_theme_constant_override("separation", 10)
+	var bar := ColorRect.new(); bar.color = EMBER; bar.custom_minimum_size = Vector2(28, 2); bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sub.add_child(bar); sub.add_child(_l("J O H N ' S   B E E R   R U N", f_bold, 12, MUTED)); col.add_child(sub)
+	col.add_child(_spacer(14))
+	for act in ["continue", "restart", "menu", "desktop"]:
+		var b := Button.new(); b.text = "    " + P_LABEL[act]; b.flat = true; b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_override("font", f_display); b.add_theme_font_size_override("font_size", 32)
+		b.add_theme_color_override("font_color", MUTED); b.add_theme_color_override("font_hover_color", INK); b.add_theme_color_override("font_focus_color", INK)
+		var empty := StyleBoxEmpty.new()
+		for st in ["normal", "hover", "pressed", "focus", "disabled"]: b.add_theme_stylebox_override(st, empty)
+		b.set_meta("act", act)
+		var ico := ColorRect.new(); ico.color = EMBER; ico.size = Vector2(14, 24); ico.position = Vector2(0, 12); ico.visible = false; ico.name = "Ico"; b.add_child(ico)
+		b.pressed.connect(func(): _p_select(p_buttons.find(b)); _p_act(act))
+		b.mouse_entered.connect(func(): _p_select(p_buttons.find(b)))
+		col.add_child(b); p_buttons.append(b)
+	col.add_child(_spacer(18))
+	col.add_child(_l("W  S  choose     Enter  select     Esc  resume", f_bold, 12, MUTED))
+	pause_root.visible = false
+
+func show_pause() -> void:
+	visible = true; title_root.visible = false; card_root.visible = false; failed_root.visible = false; pause_root.visible = true
+	_p_clear(); _p_select(0)
+
+func hide_pause() -> void:
+	pause_root.visible = false; visible = false; _p_clear()
+
+func is_paused_open() -> bool: return pause_root != null and pause_root.visible
+
+func _p_select(i: int) -> void:
+	if i < 0: return
+	p_sel = (i + p_buttons.size()) % p_buttons.size()
+	for j in p_buttons.size():
+		var b := p_buttons[j]
+		(b.get_node("Ico") as ColorRect).visible = j == p_sel
+		b.add_theme_color_override("font_color", (EMBER if b.get_meta("act") == p_confirm else INK) if j == p_sel else MUTED)
+		b.position.x = 6 if j == p_sel else 0
+
+func _p_clear() -> void:
+	p_confirm = ""
+	for b in p_buttons: b.text = "    " + P_LABEL[b.get_meta("act")]
+
+func _p_act(act: String) -> void:
+	if act == "continue": pause_action.emit("continue"); return
+	if p_confirm != act:
+		_p_clear(); p_confirm = act
+		p_buttons[p_sel].text = "    " + P_CONFIRM[act]; _p_select(p_sel)
+		Sfx.play("flick"); return
+	_p_clear(); pause_action.emit(act)
+
 func _stat(big: String, small: String) -> Control:
 	var p := PanelContainer.new()
 	var s := StyleBoxFlat.new(); s.bg_color = Color(0, 0, 0, 0.35); s.border_color = LINE; s.set_border_width_all(1); s.set_corner_radius_all(10)
@@ -250,6 +318,14 @@ func _close_panel() -> void:
 	for p in panels.values(): p.visible = false
 
 func _unhandled_input(e: InputEvent) -> void:
+	if is_paused_open():
+		if e is InputEventKey and e.pressed and not e.echo:
+			match e.keycode:
+				KEY_W, KEY_UP: _p_clear(); _p_select(p_sel - 1); get_viewport().set_input_as_handled()
+				KEY_S, KEY_DOWN: _p_clear(); _p_select(p_sel + 1); get_viewport().set_input_as_handled()
+				KEY_ENTER, KEY_KP_ENTER, KEY_SPACE: _p_act(p_buttons[p_sel].get_meta("act")); get_viewport().set_input_as_handled()
+				KEY_ESCAPE, KEY_P: pause_action.emit("continue"); get_viewport().set_input_as_handled()
+		return
 	if not visible or not title_root.visible: return
 	if e is InputEventKey and e.pressed and not e.echo:
 		match e.keycode:

@@ -181,6 +181,8 @@ func _ready() -> void:
 	menu.again_pressed.connect(func(): reset(); _capture(true))
 	menu.menu_pressed.connect(to_main_menu)
 	menu.retry_pressed.connect(func(): reset(); _capture(true))
+	menu.pause_action.connect(_on_pause_action)
+	hud.process_mode = Node.PROCESS_MODE_ALWAYS
 	reset()
 	state = "title"
 	menu.show_title()
@@ -599,7 +601,9 @@ func _input(e: InputEvent) -> void:
 	elif e.is_action_pressed("peephole") and not e.is_echo() and state == "walking":
 		if peeping: toggle_peep(false)
 		elif near_front() and not is_outside() and front_open < 0.05 and front_target == 0: toggle_peep(true)
-	elif e.is_action_pressed("ui_cancel"): _capture(Input.mouse_mode != Input.MOUSE_MODE_CAPTURED)
+	elif e is InputEventKey and e.pressed and not e.echo and (e.keycode == KEY_ESCAPE or e.keycode == KEY_P):
+		if peeping: toggle_peep(false)
+		pause_game(); get_viewport().set_input_as_handled()
 
 # ------------------------------------------------------------------ frame
 func _physics_process(dt: float) -> void:
@@ -1393,6 +1397,37 @@ func _update_car(dt: float) -> void:
 		hud.set_speed(int(round(abs(car.v) * 2.237)))
 		hud.prompt("Get out of the car")
 
+# ------------------------------------------------------------------ stage 8: pause menu
+func pause_game() -> void:
+	if get_tree().paused or state == "title" or state == "end" or not loaded: return
+	rmb_down = false; handbrake = false
+	for a in ["move_forward", "move_back", "move_left", "move_right", "run"]: Input.action_release(a)
+	get_tree().paused = true
+	AudioServer.set_bus_mute(0, true)
+	_capture(false)
+	menu.show_pause()
+
+func resume_game() -> void:
+	if not get_tree().paused: return
+	menu.hide_pause()
+	get_tree().paused = false
+	AudioServer.set_bus_mute(0, false)
+	_capture(true)
+
+func _on_pause_action(act: String) -> void:
+	match act:
+		"continue": resume_game()
+		"restart":
+			resume_game(); reset(); _capture(true)
+		"menu":
+			resume_game(); to_main_menu()
+		"desktop":
+			get_tree().quit()
+
+func _notification(what: int) -> void:
+	# alt-tab / clicking away pauses, like the web build
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and loaded and not debug_run: pause_game()
+
 # ------------------------------------------------------------------ test driver
 ## godot -- --scenario=tour --shots=/tmp/x   walks through the cabin actions and saves frames
 var debug_run := false
@@ -1638,6 +1673,16 @@ func _run_scenario(sc: String, prefix: String) -> void:
 				for c in police.cars: cs.append("%s %s%s" % [c.mode, Vector2(c.body.global_position.x, c.body.global_position.z).snapped(Vector2(1, 1)), " +off(%s)" % c.officer.mode if c.officer else ""])
 				print("[hide] t=%d seen=%.1f wanted=%.0f %s | %s" % [k, police.seen_t, store.rob.wanted, state, " | ".join(cs)])
 			if state != "walking": break
+		get_tree().quit(); return
+	if sc == "pause":
+		start(); await _wait_sim(1.0)
+		pause_game(); await get_tree().create_timer(0.5, true).timeout
+		await _shot(prefix, "1_paused")
+		menu._p_select(1); menu._p_act("restart"); await get_tree().create_timer(0.3, true).timeout
+		await _shot(prefix, "2_confirm")
+		print("[pause] paused=", get_tree().paused, " confirm=", menu.p_confirm)
+		menu._p_act("restart"); await _wait_sim(0.5)
+		print("[pause] after restart paused=", get_tree().paused, " state=", state)
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return
