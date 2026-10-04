@@ -550,7 +550,7 @@ func puff(p: Vector3, v: Vector3, size: float, life: float) -> void:
 	smokes.append({node = s, v = v, life = 0.0, max = life, size = size})
 
 # ------------------------------------------------------------------ input
-func _unhandled_input(e: InputEvent) -> void:
+func _input(e: InputEvent) -> void:
 	if state == "title" or state == "end": return
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var mx: float = e.relative.x; var my: float = e.relative.y
@@ -1342,6 +1342,20 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		await _shot(prefix, "5_tv")
 		await _wait_sim(2.0)
 		await _shot(prefix, "6_failed")
+		get_tree().quit(); return
+	if sc == "aimtest":
+		start(); await _wait_sim(0.5); interact(); await _wait_sim(1.8)
+		set_pos2(-3.0, 1.2); await _wait_sim(0.2); interact(); await _wait_sim(1.8)
+		var ev := InputEventMouseButton.new(); ev.button_index = MOUSE_BUTTON_RIGHT; ev.pressed = true; ev.position = get_viewport().get_visible_rect().size / 2
+		Input.parse_input_event(ev); await _wait_sim(0.6)
+		var y0 := yaw
+		var mm := InputEventMouseMotion.new(); mm.relative = Vector2(120, 0); mm.position = ev.position
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		Input.parse_input_event(mm); await _wait_sim(0.2)
+		var a0 := ammo
+		var lb := InputEventMouseButton.new(); lb.button_index = MOUSE_BUTTON_LEFT; lb.pressed = true; lb.position = ev.position
+		Input.parse_input_event(lb); await _wait_sim(0.3)
+		print("[aimtest] aim_t=", aim_t, " rmb=", rmb_down, " yaw moved=", yaw - y0, " ammo ", a0, "->", ammo)
 		get_tree().quit(); return
 	if sc == "title":
 		await _shot(prefix, "title"); get_tree().quit(); return

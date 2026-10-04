@@ -45,6 +45,12 @@ func _ready() -> void:
 	_build_top()
 	_build_bottom()
 	set_cans(0); set_cash(500.0); set_clock(23 * 60 + 12)
+	_ignore_mouse(root)
+
+## the HUD must never swallow clicks or mouse motion (the crosshair sits right under the captured cursor)
+func _ignore_mouse(c: Node) -> void:
+	if c is Control: (c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for ch in c.get_children(): _ignore_mouse(ch)
 
 static func sb(bg: Color, radius: int, border := Color(0, 0, 0, 0), bw := 0, pad := Vector4(10, 4, 10, 4)) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new(); s.bg_color = bg; s.set_corner_radius_all(radius)
