@@ -26,6 +26,7 @@ func _ready() -> void:
 	for node in m.find_children("J_*", "", true, false):
 		J[String(node.name).trim_prefix("J_")] = node
 	if J.has("hips"): hips_y = J.hips.position.y
+	for n in J: rest_rot[n] = (J[n] as Node3D).rotation
 	print("[visitor] ", model_path.get_file(), " joints ", J.size())
 	for mi: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -40,6 +41,8 @@ func _j(n: String) -> Node3D: return J.get(n)
 
 func pose(dt: float) -> void:
 	t += dt; k_t += dt
+	for n in ["shL", "shR", "elL", "elR", "wrL", "wrR"]:
+		if J.has(n): (J[n] as Node3D).rotation = rest_rot[n]
 	for k in blend: blend[k] = lerp(blend[k], 1.0 if anim == k else 0.0, 1.0 - exp(-dt * 6))
 	var br := sin(t * 1.7) * 0.012
 	var hips := _j("hips"); var spine := _j("spine"); var chest := _j("chest"); var head := _j("head")
@@ -103,6 +106,8 @@ func pose(dt: float) -> void:
 		_aim_ik(aim_fingers)
 
 var aim_fingers := 0.0
+var rest_rot := {}           # every joint's rest rotation: the arm IK rewrites whole joint rotations,
+                             # so each pose starts from rest or the twist would pile up frame after frame
 
 ## world-space point between his hands where the pistol grip sits, and the aim direction
 func aim_dir() -> Vector3:
@@ -111,7 +116,7 @@ func aim_dir() -> Vector3:
 
 func grip_point() -> Vector3:
 	var sL: Vector3 = (J.shL as Node3D).global_position; var sR: Vector3 = (J.shR as Node3D).global_position
-	return (sL + sR) * 0.5 + aim_dir() * 0.56 + Vector3(0, -0.07, 0)
+	return (sL + sR) * 0.5 + aim_dir() * 0.6 + Vector3(0, -0.06, 0)
 
 func _aim_ik(w: float) -> void:
 	if not (J.has("shR") and J.has("elR") and J.has("wrR") and J.has("shL")): return

@@ -381,8 +381,8 @@ func _fight_officer(o: Dictionary, dt: float) -> void:
 	else:
 		o.path = PackedVector3Array()
 	node.set_anim("walk" if moving else "idle")
-	node.aiming = los and dist < 26.0
-	if node.aiming:
+	node.aiming = true                       # gun stays up for the whole shootout, walking or not
+	if los or dist < 15.0:
 		node.rotation.y = lerp_angle(node.rotation.y, atan2(flat.x, flat.y), 1.0 - exp(-dt * 12))
 		var dy: float = (jp.y + (1.0 if g.state == "driving" else 1.25)) - (p.y + 1.42)
 		node.aim_pitch = atan2(dy, max(dist, 0.5))
@@ -390,7 +390,7 @@ func _fight_officer(o: Dictionary, dt: float) -> void:
 	node.pose(dt)
 	_update_officer_gun(o)
 	o.fire_cd -= dt
-	if node.aiming and node.aim_w > 0.8 and o.fire_cd <= 0 and g.hp > 0 and g.state != "end": _officer_fire(o)
+	if los and dist < 26.0 and node.aim_w > 0.8 and o.fire_cd <= 0 and g.hp > 0 and g.state != "end": _officer_fire(o)
 
 func _sees_car(from: Vector3) -> bool:
 	if g.car == null: return false
@@ -412,7 +412,7 @@ func _place_officer_gun(o: Dictionary) -> void:
 	if not is_instance_valid(o.gun) or not is_instance_valid(o.node): return
 	var gun: Node3D = o.gun
 	var node: Node3D = o.node
-	gun.visible = node.aim_w > 0.35
+	gun.visible = node.aim_w > 0.08
 	if not gun.visible: return
 	var dir: Vector3 = node.aim_dir()
 	var palm: Vector3

@@ -1815,11 +1815,36 @@ func _run_scenario(sc: String, prefix: String) -> void:
 			get_tree().quit(); return
 		police.resist()
 		debug_cam = {}
+		if mode == "long": hp = 1e9
 		print("[arrest] resisted: state=", state, " hostile=", police.hostile, " gun_out=", gun_out())
 		for k in 5:
 			await _wait_sim(0.1)
 			print("[draw] gun_out=", gun_out(), " aim_hold=%.2f aim_t=%.2f ik=%.2f visible=%s facing=%.2f yaw=%.2f" % [aim_hold, aim_t, john.snort_ik.w, gun_rig.visible, john.facing, yaw])
 		await _shot(prefix, "2_draw")
+		if mode == "chase":
+			set_pos2(-30.0 + 12.0, -29.0 + 9.0)
+			for k in 6:
+				await _wait_sim(0.4)
+				var o0: Dictionary = police.officers[0]
+				print("[chase] aim_w=%.2f gun=%s anim=%s d=%.1f" % [o0.node.aim_w, o0.gun.visible, o0.node.anim, (o0.node as Node3D).global_position.distance_to(john.global_position)])
+			var on: Node3D = police.officers[0].node
+			var of2 := Vector3(sin(on.rotation.y), 0, cos(on.rotation.y)); var or2 := Vector3(-cos(on.rotation.y), 0, sin(on.rotation.y))
+			debug_cam = {pos = on.global_position + of2 * 1.6 + or2 * 1.4 + Vector3(0, 1.6, 0), at = on.global_position + Vector3(0, 1.1, 0)}
+			await _wait_sim(0.05); await _shot(prefix, "6_officer_walk_aim")
+			get_tree().quit(); return
+		if mode == "long":
+			# stand-off for a long time: the arms must not drift
+			for k in 12:
+				await _wait_sim(2.0)
+				for o in police.officers:
+					var J: Dictionary = o.node.J
+					var wr: Vector3 = (J.wrR as Node3D).global_position; var sh: Vector3 = (J.shR as Node3D).global_position
+					print("[long] t=%d reach=%.2f elR=%s gun=%s aim_w=%.2f" % [k * 2, wr.distance_to(sh), (J.elR as Node3D).rotation.snapped(Vector3(0.01, 0.01, 0.01)), o.gun.visible, o.node.aim_w])
+			var on: Node3D = police.officers[0].node
+			var of2 := Vector3(sin(on.rotation.y), 0, cos(on.rotation.y)); var or2 := Vector3(-cos(on.rotation.y), 0, sin(on.rotation.y))
+			debug_cam = {pos = on.global_position + of2 * 1.5 + or2 * 1.3 + Vector3(0, 1.6, 0), at = on.global_position + of2 * 0.3 + Vector3(0, 1.25, 0)}
+			await _wait_sim(0.05); await _shot(prefix, "7_after_24s")
+			get_tree().quit(); return
 		if mode == "die":
 			for k in 40:
 				await _wait_sim(0.5)
