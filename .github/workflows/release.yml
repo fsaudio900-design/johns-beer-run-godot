@@ -1,9 +1,12 @@
 name: Release
-# Pushing a version tag (v2.3, v2.4, ...) publishes a GitHub Release with the
-# notes from release_notes/<tag>.md and a ready-to-import project zip attached.
+# Adding release_notes/vX.Y.md on main publishes GitHub Release vX.Y with those
+# notes and a ready-to-import project zip attached. (The first line of the notes
+# file is the release title.)
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['release_notes/*.md']
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -11,16 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build the project zip
-        run: |
-          mkdir -p dist
-          git archive --format=zip --prefix=JohnsBeerRun/ -o "dist/JohnsBeerRun-${GITHUB_REF_NAME}.zip" HEAD
-      - name: Publish the release
+        with:
+          fetch-depth: 0
+      - name: Publish any versions that don't have a release yet
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="release_notes/${GITHUB_REF_NAME}.md"
-          [ -f "$NOTES" ] || echo "John's Beer Run ${GITHUB_REF_NAME}" > "$NOTES"
-          TITLE=$(head -n 1 "$NOTES" | sed 's/^# *//')
-          gh release create "$GITHUB_REF_NAME" "dist/JohnsBeerRun-${GITHUB_REF_NAME}.zip" \
-            --title "$TITLE" --notes-file "$NOTES" --latest
+          set -e
+          mkdir -p dist
+          for NOTES in $(ls release_notes/v*.md | sort -V); do
+            TAG=$(basename "$NOTES" .md)
+            if gh release view "$TAG" >/dev/null 2>&1; then continue; fi
+            TITLE=$(head -n 1 "$NOTES" | sed 's/^# *//')
+            tail -n +2 "$NOTES" > dist/notes.md
+            git archive --format=zip --prefix=JohnsBeerRun/ -o "dist/JohnsBeerRun-$TAG.zip" HEAD
+            gh release create "$TAG" "dist/JohnsBeerRun-$TAG.zip" --target "$GITHUB_SHA" \
+              --title "$TITLE" --notes-file dist/notes.md --latest
+            echo "published $TAG"
+          done
