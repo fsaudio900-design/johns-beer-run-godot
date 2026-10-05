@@ -1,0 +1,116 @@
+label job
+Ben: Actually, glad you came by. I've got a job for you.
+- What kind of job?
+	Ben: The Fuel Stop on Main Street. This time of night, that register's full.
+	John: You want me to rob the gas station?
+	Ben: Just bring me the money. All of it. I'll make it worth your while.
+	- Sure, I'm in.
+		[signal arg="accept"]
+		Ben: That's my guy! I knew I could count on you.
+		Ben: Go on. I'll be right here.
+	- Not tonight, Ben.
+		[signal arg="reject"]
+		Ben: No worries. The offer stands.
+		Ben: Knock if you change your mind.
+	- Why don't you do it yourself?
+		[signal arg="cold"]
+		Ben: Me? Oh, John. Some of us have reputations to keep.
+		Ben: Not everyone gets to just... be you.
+		- Fine. I'll do it.
+			[signal arg="accept"]
+			Ben: Wow. Thank you SO much. I'm touched. Really.
+		- Nah. Forget it.
+			[signal arg="reject"]
+			Ben: No, no, it's fine. I'll just sit here. Broke. Alone.
+			Ben: Don't worry about me. You never do.
+- Make it quick, Ben. My beer's getting warm.
+	[signal arg="cold"]
+	Ben: Lovely to see you too, John.
+	Ben: The Fuel Stop on Main Street. Rob it. Bring me the money. Is that quick enough for you?
+	- Fine. I'll do it.
+		[signal arg="accept"]
+		Ben: Look at you, helping out a friend. I'll mark the calendar.
+	- Not interested.
+		[signal arg="reject"]
+		Ben: Of course you're not. Go enjoy your warm beer, John.
+[end_timeline]
+
+label again_nice
+Ben: Hey, John. Change your mind about that job?
+- Yeah. I'll do it.
+	[signal arg="accept"]
+	Ben: Knew you'd come around. Fuel Stop. Register. All of it.
+- Still no.
+	[signal arg="reject"]
+	Ben: Alright, alright. You know where I live.
+- Why don't you just do it yourself?
+	[signal arg="cold"]
+	[signal arg="reject"]
+	Ben: Wow. Okay. Forget I asked.
+[end_timeline]
+
+label again_cold
+Ben: Oh. It's you. Here to let me down again?
+- Fine. I'll do the job.
+	[signal arg="accept"]
+	Ben: Well, well. Miracles do happen.
+- Sorry about before. I'm in.
+	[signal arg="nice"]
+	[signal arg="accept"]
+	Ben: ...Apology accepted. Now go. Fuel Stop. All of it.
+- Just came to say hi.
+	[signal arg="reject"]
+	Ben: How thoughtful. Hi, John. Bye, John.
+[end_timeline]
+
+label remind_nice
+Ben: Fuel Stop. Register. Money. You've got this, John.
+[end_timeline]
+
+label remind_cold
+Ben: The register isn't going to empty itself, John.
+Ben: Take your time. It's not like I'm waiting or anything.
+[end_timeline]
+
+label already
+Ben: Hold on. Is that a wad of cash in your pocket?
+John: Might be. The Fuel Stop had a bad night.
+Ben: Ha! You beat me to it. I was going to ask you to do exactly that.
+Ben: Hand it over and I'll cut you in.
+- Here. Take it.
+	[signal arg="owed"]
+	jump pay_nice
+- Get your own.
+	[signal arg="cold"]
+	[signal arg="reject"]
+	Ben: Wow. Okay. Enjoy your money, I guess.
+[end_timeline]
+
+label pay_nice
+John: Here. All of it.
+Ben: Ha! Look at that! You beautiful lunatic.
+[signal arg="paid"]
+Ben: There's your cut. Now get lost before the cops come knocking.
+[end_timeline]
+
+label pay_cold
+John: Here. All of it.
+Ben: Huh. You actually did it. I'm almost proud.
+[signal arg="paid"]
+Ben: There's your cut. Don't spend it all on beer. Who am I kidding.
+[end_timeline]
+
+label pay_short
+John: Here. That's... most of it.
+Ben: That's it? Where's the rest of it, John?
+[signal arg="paid"]
+Ben: Whatever. There's your cut. Next time, don't stop for snacks.
+[end_timeline]
+
+label after_nice
+Ben: Lay low for a while, John. We're square.
+[end_timeline]
+
+label after_cold
+Ben: We're square. Don't let the door hit you on the way out.
+[end_timeline]

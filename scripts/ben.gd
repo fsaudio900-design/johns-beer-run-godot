@@ -128,7 +128,8 @@ func _cut_hole(mi: MeshInstance3D, hole: Rect2, zf: float) -> void:
 	mi.mesh = out
 
 func reset() -> void:
-	st = "inside"; t = 0.0; mission = "none"; owed = 0.0; visits = 0; lines = []
+	_abort_dialog()
+	st = "inside"; t = 0.0; mission = "none"; owed = 0.0; visits = 0; lines = []; mood = "nice"
 	hp = 3
 	if dead and ben:
 		dead = false
@@ -152,6 +153,7 @@ func hint() -> String:
 	if dead: return ""
 	if mission == "rob" and owed <= 0.0: return "Ben's job: rob the Fuel Stop on Main Street"
 	if mission == "rob": return "Bring the money to Ben, across the street"
+	if mission == "declined": return ""
 	return ""
 
 func prompt() -> Array:
@@ -182,65 +184,68 @@ func interact() -> bool:
 		if can_pay(): _pay()
 		else: _talk()
 		return true
-	if st == "talking": line_t = min(line_t, 0.05); return true      # E skips to the next line
+	if st == "talking": return true      # E is also Dialogic's "next line" key
 	return st == "coming"
 
-# ------------------------------------------------------------------ the conversations
+# ------------------------------------------------------------------ the conversations (Dialogic)
+## Ben's conversations are a Dialogic timeline (dialogue/ben.dtl) with a label per situation.
+## The player's choices send signals back here: accept / reject the job, and whether John was
+## rude ("cold") or made up for it ("nice") - Ben stays passive-aggressive until John does.
+const TIMELINE := "res://dialogue/ben.dtl"
+var mood := "nice"               # nice | cold
+var dialog_on := false
+
 func _talk() -> void:
-	var slur: bool = g.beers >= 3
+	var label := ""
 	match mission:
 		"none":
-			lines = [["B", "Actually, glad you came by. I've got a job for you.", "Talk"],
-				["J", "A job? Whash kind of job?" if slur else "A job? What kind of job?"],
-				["B", "The Fuel Stop on Main Street. That register's full this time of night.", "Talk"],
-				["J", "You want me to rob the gash station?" if slur else "You want me to rob the gas station?"],
-				["B", "Just bring me the money. All of it. I'll make it worth your while.", "Nod"],
-				["J", "...Fine. I'll be back."],
-				["B", "Don't keep me waiting.", "Idle", "rob"]]
-			if g.store.rob.till == false and g.store.haul > 0.0:
-				lines[5] = ["J", "Funny you should say that. Already did it."]
-				lines[6] = ["B", "Ha! Then hand it over.", "Laugh", "rob_done"]
-		"rob":
-			lines = [["B", ["The register isn't going to empty itself, John.", "Fuel Stop. Register. Money. Go.", "Why are you still standing here?"].pick_random(), "Shrug"]]
-		"done":
-			lines = [["B", ["Lay low for a while, John.", "We're square. Go home.", "Nice doing business with you."].pick_random(), "Nod"]]
-	_start_lines()
+			label = "already" if (g.store.rob.till == false and g.store.haul > 0.0) else "job"
+		"declined": label = "again_" + mood
+		"rob": label = "remind_" + mood
+		"done": label = "after_" + mood
+	if label == "": return
+	_dialog(label)
 
 func _pay() -> void:
-	var give: float = min(owed, g.store.cash)
-	var cut: float = round(give * 0.25)
-	g.store.add_cash(-give)
-	lines = [["J", "Here. All of it."],
-		["B", "Ha! Look at that!", "Laugh"],
-		["B", "Here's your cut. Now get lost before the cops come knocking.", "Talk", "paid", cut]]
-	if give < owed * 0.6: lines[1] = ["B", "That's it? Where's the rest of it?", "ShakeHead"]
-	mission = "done"; owed = 0.0
-	_start_lines()
+	_dialog("pay_short" if g.store.cash < owed * 0.6 else "pay_" + mood)
 
-func _start_lines() -> void:
-	st = "talking"; line_i = 0; line_t = 0.0
-	g.set_state("busy")
-	g.hud.prompt("")
-	_next_line()
+func _dialog(label: String) -> void:
+	var D: Node = get_node_or_null("/root/Dialogic")
+	if D == null: return
+	if not D.signal_event.is_connected(_on_dialog_signal): D.signal_event.connect(_on_dialog_signal)
+	if not D.timeline_ended.is_connected(_on_dialog_end): D.timeline_ended.connect(_on_dialog_end)
+	st = "talking"; dialog_on = true
+	g.set_state("busy"); g.hud.prompt(""); g._capture(false)
+	g.hud.sub_t = 0.0; g.hud.sub.modulate.a = 0.0     # clear the doorstep subtitle under the dialogue box
+	_play("Talk")
+	D.start(TIMELINE, label)
 
-func _next_line() -> void:
-	if line_i >= lines.size():
-		st = "door"; t = 0.0; away_t = 0.0; _play("Idle")
-		g.set_state("walking"); return
-	var ln: Array = lines[line_i]
-	if ln[0] == "B":
-		b_say(ln[1], 3.0); _play(ln[2] if ln.size() > 2 else "Talk")
-		if ln.size() > 3:
-			match ln[3]:
-				"rob": mission = "rob"
-				"rob_done": mission = "rob"; owed = g.store.haul
-				"paid":
-					var cut: float = ln[4]
-					if cut > 0: g.store.add_cash(cut)
-	else:
-		g.say(ln[1], 2.6); _play("Idle")
-	line_t = 3.1 if ln[0] == "B" else 2.6
-	line_i += 1
+func _on_dialog_signal(arg: Variant) -> void:
+	match str(arg):
+		"accept": mission = "rob"; _play("Nod")
+		"reject": mission = "declined"; _play("Shrug")
+		"cold": mood = "cold"; _play("ShakeHead")
+		"nice": mood = "nice"; _play("Nod")
+		"owed": mission = "rob"; owed = g.store.haul
+		"paid":
+			var give: float = min(owed, g.store.cash)
+			var cut: float = round(give * 0.25)
+			g.store.add_cash(-give)
+			if cut > 0: get_tree().create_timer(1.2).timeout.connect(func(): g.store.add_cash(cut))
+			mission = "done"; owed = 0.0; _play("Laugh")
+
+func _on_dialog_end() -> void:
+	if not dialog_on: return
+	dialog_on = false
+	if dead: return
+	st = "door"; t = 0.0; away_t = 0.0; _play("Idle")
+	g.set_state("walking"); g._capture(true)
+
+## ends a conversation early (Ben got shot, the game was reset)
+func _abort_dialog() -> void:
+	var D: Node = get_node_or_null("/root/Dialogic")
+	if dialog_on and D and D.current_timeline != null: D.end_timeline()
+	if dialog_on: dialog_on = false; g.set_state("walking"); g._capture(true)
 
 # ------------------------------------------------------------------ update
 func update(dt: float) -> void:
@@ -259,6 +264,7 @@ func update(dt: float) -> void:
 					st = "door"; t = 0.0; away_t = 0.0; _play("Idle")
 					visits += 1
 					var greet := "John! Little late for a visit, isn't it?" if visits == 1 else "Back again?"
+					if mission == "declined": greet = "Oh. John." if mood == "cold" else "Hey, John!"
 					if mission == "rob" and owed > 0.0: greet = "Well? You got it?"
 					elif mission == "rob": greet = "Did you do it yet?"
 					b_say(greet, 2.6)
@@ -271,8 +277,7 @@ func update(dt: float) -> void:
 			if away_t > 2.5: st = "going"; t = 0.0
 		"talking":
 			_face_john(dt)
-			line_t -= dt
-			if line_t <= 0.0: _next_line()
+			if anim and not anim.is_playing(): _play("Talk")
 		"going":
 			if ben.visible:
 				var k: float = clamp(t / 1.2, 0.0, 1.0)
@@ -341,7 +346,7 @@ func on_shot(from: Vector3, dir: Vector3, hit: Dictionary) -> bool:
 	if back: g.store.splat(back.position, back.normal, 0.9 if zone == "head" else 0.55)
 	g.store.start_wanted()
 	hp -= 3 if zone == "head" else 1
-	if st == "talking": lines = []; line_i = 0; g.set_state("walking")
+	if st == "talking": _abort_dialog()
 	if hp <= 0: _die(dir, zone)
 	else:
 		mission = "off"; owed = 0.0

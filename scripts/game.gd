@@ -585,6 +585,8 @@ func puff(p: Vector3, v: Vector3, size: float, life: float) -> void:
 # ------------------------------------------------------------------ input
 func _input(e: InputEvent) -> void:
 	if state == "title" or state == "end": return
+	# during a Dialogic conversation the mouse belongs to the dialogue box (choices)
+	if ben_mod and ben_mod.dialog_on and e is InputEventMouseButton: return
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var mx: float = e.relative.x; var my: float = e.relative.y
 		if abs(mx) > 300 or abs(my) > 300: return
@@ -1404,6 +1406,25 @@ func _debug_args() -> Dictionary:
 		if s.begins_with("--") and s.contains("="): a[s.substr(2, s.find("=") - 2)] = s.substr(s.find("=") + 1)
 	return a
 
+## plays a Dialogic conversation for tests: advances text, picks the given choices (1-based)
+func _dlg_drive(picks: Array, shot_prefix: String) -> void:
+	var D: Node = get_node("/root/Dialogic")
+	var q := {on = false, n = 0}
+	var cb := func(_i): q.on = true
+	D.Choices.question_shown.connect(cb)
+	var guard := 0
+	while ben_mod.dialog_on and guard < 300:
+		guard += 1
+		await _wait_sim(0.3)
+		if q.on and picks.size() > 0:
+			q.on = false
+			await _wait_sim(0.4)
+			if shot_prefix != "": q.n += 1; await _shot(_debug_args().get("prefix", "/tmp/shot"), "%s_choice%d" % [shot_prefix, q.n])
+			D.Choices.select_choice(picks.pop_front())
+		elif not q.on:
+			D.Inputs.handle_input()
+	D.Choices.question_shown.disconnect(cb)
+
 func _wait_sim(sec: float) -> void:
 	var target := clock_t + sec
 	while clock_t < target: await get_tree().process_frame
@@ -1638,10 +1659,7 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		interact(); await _wait_sim(3.6)
 		print("[ben] after knock: st=", ben_mod.st, " visible=", ben_mod.ben.visible, " door=", ben_mod.door_open, " ben at ", ben_mod.ben.global_position, " prompt=", ben_mod.prompt())
 		await _shot(prefix, "ben1_answers")
-		interact()
-		for i in 8:
-			await _wait_sim(2.7)
-			if i == 0 or i == 2: await _shot(prefix, "ben2_talk%d" % i)
+		interact(); await _dlg_drive([1, 1], "")
 		print("[ben] after talk: mission=", ben_mod.mission, " st=", ben_mod.st, " state=", state, " hint=", ben_mod.hint())
 		debug_cam = {}
 		# rob the till (the clerk hands it over at gunpoint)
@@ -1655,12 +1673,12 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		interact(); await _wait_sim(3.6)
 		print("[ben] second knock: st=", ben_mod.st, " prompt=", ben_mod.prompt())
 		var c1: float = store.cash
-		interact(); await _wait_sim(10.0)
+		interact(); await _dlg_drive([], ""); await _wait_sim(1.5)
 		print("[ben] paid: mission=", ben_mod.mission, " cash ", c1, " -> ", store.cash, " state=", state)
 		debug_cam = {pos = Vector3(2.6, 1.3, -40.6), at = Vector3(0.9, 0.9, -44.2)}
 		await _wait_sim(0.2); await _shot(prefix, "ben3_after")
 		debug_cam = {}
-		interact(); await _wait_sim(4.0)
+		interact(); await _dlg_drive([], "")
 		print("[ben] talk after: st=", ben_mod.st)
 		get_tree().quit(); return
 	if sc == "benshot":
@@ -1690,6 +1708,46 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		for i in 4:
 			await _wait_sim(0.6); print("[benshot] t=", 0.6 * (i + 1), " hips ", ben_mod.rag_hips()); await _shot(prefix, "bs3_dead%d" % i)
 		print("[benshot] ragdoll hips at ", ben_mod.rag_hips(), " prompt=", ben_mod.prompt(), " hint=", ben_mod.hint())
+		get_tree().quit(); return
+	if sc == "bendlg":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		var D: Node = get_node("/root/Dialogic")
+		D.Text.about_to_show_text.connect(func(info): print("[say] ", (info.character.display_name if info.get("character") else "?"), ": ", info.text))
+		D.Choices.question_shown.connect(func(info): var o := []; (func(): for c in info.choices: o.append(c.text)).call(); print("[choices] ", o))
+		set_pos2(0.9, -42.9); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.15
+		await _wait_sim(0.4); interact(); await _wait_sim(3.6)
+		debug_cam = {pos = Vector3(2.4, 1.5, -40.4), at = Vector3(0.9, 1.1, -44.2)}
+		print("[bendlg] --- A: ask, why don't you, forget it")
+		interact(); await _dlg_drive([1, 3, 2], "dlg_a")
+		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood, " state=", state, " mouse=", Input.mouse_mode)
+		set_pos2(0.9, -30.0); await _wait_sim(4.5); set_pos2(0.9, -42.9); await _wait_sim(0.3)
+		interact(); await _wait_sim(3.6)
+		print("[bendlg] --- B: back again (cold), apologise")
+		interact(); await _dlg_drive([2], "dlg_b")
+		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood, " hint=", ben_mod.hint())
+		print("[bendlg] --- C: reminder")
+		interact(); await _dlg_drive([], "")
+		store.hands_up(); await _wait_sim(0.5); store.demand_cash(); await _wait_sim(3.0)
+		var c0: float = store.cash
+		print("[bendlg] --- D: pay (haul ", store.haul, ") prompt=", ben_mod.prompt())
+		interact(); await _dlg_drive([], "dlg_d"); await _wait_sim(1.5)
+		print("[bendlg] mission=", ben_mod.mission, " cash ", c0, " -> ", store.cash)
+		print("[bendlg] --- E: after")
+		interact(); await _dlg_drive([], "")
+		# a fresh game: the polite refusal, then accept on the way back
+		reset(); await _wait_sim(0.5); start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(0.9, -42.9); john.global_position.y = -0.3; await _wait_sim(0.3); interact(); await _wait_sim(3.6)
+		print("[bendlg] --- F: ask, not tonight")
+		interact(); await _dlg_drive([1, 2], "")
+		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood)
+		print("[bendlg] --- G: back again (nice), yes")
+		interact(); await _dlg_drive([1], "")
+		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood)
+		print("[bendlg] --- H: reset, rude opener, not interested")
+		reset(); await _wait_sim(0.5); start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(0.9, -42.9); john.global_position.y = -0.3; await _wait_sim(0.3); interact(); await _wait_sim(3.6)
+		interact(); await _dlg_drive([2, 2], "")
+		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood, " state=", state)
 		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
