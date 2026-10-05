@@ -8,7 +8,7 @@ signal menu_pressed
 signal retry_pressed
 signal pause_action(act: String)
 
-const VERSION := "v2.16"
+const VERSION := "v2.17"
 const INK := Color("#f4e8d4")
 const MUTED := Color("#bba78c")
 const EMBER := Color("#ff8a3d")

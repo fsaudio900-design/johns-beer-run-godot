@@ -1117,7 +1117,9 @@ func fire() -> void:
 	if debug_run: print("[fire] muzzle·aim=", gun_rig.global_transform.basis.z.normalized().dot((aim_point - muzzle).normalized()), " up=", gun_rig.global_transform.basis.y, " hit=", aim_hit.get("collider"), " at ", aim_hit.get("position"))
 	pitch = clamp(pitch - 0.03, -0.45, 1.0); yaw += (randf() - 0.5) * 0.012
 	var cam_dir := -cam.global_transform.basis.z
-	if police and police.on_shot(cam.global_position, cam_dir, aim_hit):
+	if ben_mod and ben_mod.on_shot(cam.global_position, cam_dir, aim_hit):
+		flash_mark = 0.15
+	elif police and police.on_shot(cam.global_position, cam_dir, aim_hit):
 		flash_mark = 0.15
 	elif store and store.on_shot(cam.global_position, cam_dir, aim_hit):
 		flash_mark = 0.15
@@ -1660,6 +1662,34 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		debug_cam = {}
 		interact(); await _wait_sim(4.0)
 		print("[ben] talk after: st=", ben_mod.st)
+		get_tree().quit(); return
+	if sc == "benshot":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(0.9, -41.6); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.15
+		await _wait_sim(0.5)
+		debug_cam = {pos = Vector3(3.2, 1.4, -40.2), at = Vector3(0.9, 0.9, -44.6)}
+		await _wait_sim(0.3); await _shot(prefix, "bs0_wall_closed")
+		set_pos2(0.9, -42.9); await _wait_sim(0.3); interact(); await _wait_sim(3.6)
+		await _shot(prefix, "bs1_open")
+		debug_cam = {pos = Vector3(0.9, 1.5, -40.5), at = Vector3(0.9, 1.0, -45.0)}
+		await _wait_sim(0.3); await _shot(prefix, "bs2_doorway_straight")
+		# wound him
+		var sk: Skeleton3D = ben_mod._skel()
+		var from := Vector3(0.9, 1.4, -41.5)
+		var chest: Vector3 = ben_mod._bone_pos(sk, "chest")
+		print("[benshot] body hit: ", ben_mod.on_shot(from, (chest - from).normalized(), {}), " hp=", ben_mod.hp, " st=", ben_mod.st, " mission=", ben_mod.mission)
+		await _wait_sim(3.0)
+		print("[benshot] after wound: st=", ben_mod.st, " visible=", ben_mod.ben.visible)
+		interact(); await _wait_sim(1.0)
+		print("[benshot] knock after wound: st=", ben_mod.st, " prompt=", ben_mod.prompt())
+		ben_mod.reset(); await _wait_sim(0.3)
+		interact(); await _wait_sim(3.6)
+		var head: Vector3 = ben_mod._bone_pos(sk, "head") + Vector3(0, 0.1, 0)
+		print("[benshot] head hit: ", ben_mod.on_shot(from, (head - from).normalized(), {}), " dead=", ben_mod.dead)
+		debug_cam = {pos = Vector3(3.2, 1.6, -40.6), at = Vector3(0.9, 0.3, -43.8)}
+		for i in 4:
+			await _wait_sim(0.6); print("[benshot] t=", 0.6 * (i + 1), " hips ", ben_mod.rag_hips()); await _shot(prefix, "bs3_dead%d" % i)
+		print("[benshot] ragdoll hips at ", ben_mod.rag_hips(), " prompt=", ben_mod.prompt(), " hint=", ben_mod.hint())
 		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
