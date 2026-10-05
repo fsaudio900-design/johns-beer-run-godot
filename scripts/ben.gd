@@ -249,7 +249,9 @@ func _abort_dialog() -> void:
 
 # ------------------------------------------------------------------ update
 func update(dt: float) -> void:
-	if ben == null or dead: return
+	if ben == null: return
+	_update_holo(dt)
+	if dead: return
 	t += dt
 	# the till's been emptied while Ben's job is on: that's what he's owed
 	if mission == "rob" and owed <= 0.0 and g.store.haul > 0.0 and g.store.rob.till == false: owed = g.store.haul
@@ -391,3 +393,76 @@ func rag_hips() -> Vector3:
 		for pb: PhysicalBone3D in sim.get_children():
 			if pb.bone_name == "hips": return pb.global_position
 	return Vector3.ZERO
+
+# ------------------------------------------------------------------ mission marker (v2.20)
+## A gold hologram in front of Ben's door (a beam of light, a pulsing ring on the ground and a
+## floating "!") shows there's a job to be had - or that Ben is waiting for his money. It fades
+## away as John walks up, and the minimap shows the same marker.
+const MARK_POS := Vector3(0.9, -0.3, -42.75)
+var holo: Node3D
+var holo_fade := 0.0
+
+
+func marker_on() -> bool:
+	if ben == null or dead or g.state == "title": return false
+	return mission == "none" or mission == "declined" or (mission == "rob" and owed > 0.0)
+func marker_pos2() -> Vector2: return Vector2(MARK_POS.x, MARK_POS.z)
+## fully visible from afar, gone by the time John is at the door
+func marker_fade(dist: float) -> float:
+	var k: float = clamp((dist - 2.2) / 6.5, 0.0, 1.0)
+	return k * k * (3.0 - 2.0 * k)
+
+func _holo_mat(tex_path: String, billboard := false) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# additive with premultiplied textures: brightness lives in the colour (some renderers ignore alpha in add mode)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED; m.no_depth_test = false
+	m.albedo_texture = load(tex_path); m.albedo_color = HOLO_TINT
+	if billboard: m.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	holo_mats.append(m); return m
+
+const HOLO_TINT := Color(1.0, 0.68, 0.16)
+var holo_mats: Array[StandardMaterial3D] = []
+var holo_icon: MeshInstance3D
+var holo_ring: MeshInstance3D
+var holo_beam: MeshInstance3D
+var holo_light: OmniLight3D
+var holo_t := 0.0
+
+func _build_holo() -> void:
+	holo = Node3D.new(); holo.name = "BenMissionHolo"; g.add_child(holo); holo.global_position = MARK_POS
+	holo_beam = MeshInstance3D.new(); var cm := CylinderMesh.new()
+	cm.top_radius = 0.42; cm.bottom_radius = 0.42; cm.height = 2.8; cm.cap_top = false; cm.cap_bottom = false; cm.radial_segments = 32
+	holo_beam.mesh = cm; holo_beam.material_override = _holo_mat("res://assets/ui/holo_beam.png"); holo_beam.position.y = 1.4; holo.add_child(holo_beam)
+	holo_ring = MeshInstance3D.new(); var pm := PlaneMesh.new(); pm.size = Vector2(1.5, 1.5)
+	holo_ring.mesh = pm; holo_ring.material_override = _holo_mat("res://assets/ui/holo_ring.png"); holo_ring.position.y = 0.03; holo.add_child(holo_ring)
+	holo_icon = MeshInstance3D.new(); var qm := QuadMesh.new(); qm.size = Vector2(0.42, 0.84)
+	holo_icon.mesh = qm; holo_icon.material_override = _holo_mat("res://assets/ui/holo_mark.png", true); holo_icon.position.y = 2.15; holo.add_child(holo_icon)
+	holo_light = OmniLight3D.new(); holo_light.light_color = Color(1.0, 0.7, 0.25); holo_light.omni_range = 3.0
+	holo_light.position.y = 1.0; holo.add_child(holo_light)
+	for mi: MeshInstance3D in holo.find_children("*", "MeshInstance3D", true, false):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+var holo_freeze := false        # tests
+func _glow(k: float) -> Color: return Color(HOLO_TINT.r * k, HOLO_TINT.g * k, HOLO_TINT.b * k, 1.0)
+func _update_holo(dt: float) -> void:
+	if holo == null: _build_holo()
+	if holo_freeze: return
+	var want := 0.0
+	if marker_on() and st != "talking":
+		want = marker_fade(Vector2(g.john.global_position.x, g.john.global_position.z).distance_to(marker_pos2()))
+	holo_fade = move_toward(holo_fade, want, dt * 2.5)
+	holo.visible = holo_fade > 0.005
+	if not holo.visible: return
+	holo_t += dt
+	var flick := 0.9 + 0.1 * sin(holo_t * 23.0) * sin(holo_t * 7.0)
+	var pulse := 0.85 + 0.15 * sin(holo_t * 3.0)
+	(holo_beam.material_override as StandardMaterial3D).albedo_color = _glow(0.75 * holo_fade * flick)
+	(holo_beam.material_override as StandardMaterial3D).uv1_offset.y = -fmod(holo_t * 0.12, 1.0)   # scan lines rise
+	(holo_ring.material_override as StandardMaterial3D).albedo_color = _glow(0.9 * holo_fade * pulse)
+	holo_ring.scale = Vector3.ONE * (0.95 + 0.08 * sin(holo_t * 3.0))
+	(holo_icon.material_override as StandardMaterial3D).albedo_color = _glow(1.1 * holo_fade * flick)
+	holo_icon.position.y = 2.15 + 0.07 * sin(holo_t * 2.2)
+	holo_light.light_energy = 0.5 * holo_fade

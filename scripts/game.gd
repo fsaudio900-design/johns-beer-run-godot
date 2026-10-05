@@ -180,6 +180,7 @@ func _ready() -> void:
 	bar_mod.setup(self)
 	ben_mod = Node.new(); ben_mod.set_script(load("res://scripts/ben.gd")); ben_mod.name = "BenNPC"; add_child(ben_mod)
 	ben_mod.setup(self)
+	var mm := Control.new(); mm.set_script(load("res://scripts/minimap.gd")); mm.name = "Minimap"; hud.root.add_child(mm); mm.setup(self)
 	menu.start_pressed.connect(start)
 	menu.again_pressed.connect(func(): reset(); _capture(true))
 	menu.menu_pressed.connect(to_main_menu)
@@ -1748,6 +1749,40 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		set_pos2(0.9, -42.9); john.global_position.y = -0.3; await _wait_sim(0.3); interact(); await _wait_sim(3.6)
 		interact(); await _dlg_drive([2, 2], "")
 		print("[bendlg] mission=", ben_mod.mission, " mood=", ben_mod.mood, " state=", state)
+		get_tree().quit(); return
+	if sc == "mapbake":
+		# top-down daylight render of the town for the minimap (tools/make_minimap.py styles it)
+		start(); await _wait_sim(0.5)
+		hud.visible = false; post_rect.visible = false; john.visible = false
+		env.fog_enabled = false; env.glow_enabled = false; env.ssao_enabled = false
+		env.background_mode = Environment.BG_COLOR; env.background_color = Color(0.2, 0.2, 0.2)
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color = Color(1, 1, 1); env.ambient_light_energy = 1.2
+		for l: Light3D in get_tree().root.find_children("*", "Light3D", true, false): l.visible = false
+		var sun := DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-70, 20, 0); sun.light_energy = 1.4; sun.shadow_enabled = true; add_child(sun)
+		var c := Camera3D.new(); c.projection = Camera3D.PROJECTION_ORTHOGONAL; c.keep_aspect = Camera3D.KEEP_HEIGHT
+		c.size = 74.0; c.near = 1.0; c.far = 200.0
+		add_child(c); c.global_position = Vector3(-52.5, 80.0, -25.0); c.rotation_degrees = Vector3(-90, 0, 0); c.current = true
+		set_process(false)
+		for i in 8: await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/tmp/map_raw.png")
+		print("[mapbake] saved ", get_viewport().get_texture().get_size())
+		get_tree().quit(); return
+	if sc == "holo":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		john.global_position.y = -0.3
+		for d in [[-28.0, "h0_far"], [-37.5, "h1_mid"], [-41.4, "h2_near"], [-43.0, "h3_door"]]:
+			set_pos2(0.9, d[0]); john.facing = PI; yaw = 0.0; pitch = 0.12
+			await _wait_sim(1.2)
+			var dist: float = Vector2(0.9, d[0]).distance_to(ben_mod.marker_pos2())
+			print("[holo] dist ", snapped(dist, 0.1), " fade ", snapped(ben_mod.holo_fade, 0.01), " visible ", ben_mod.holo.visible)
+			await _shot(prefix, d[1])
+		# out on Main Street: bar and Fuel Stop symbols on the minimap
+		set_pos2(-64.0, -30.5); john.facing = -PI / 2; yaw = PI / 2; await _wait_sim(1.2)
+		await _shot(prefix, "h4_street")
+		# job taken: the marker goes
+		ben_mod.mission = "rob"; await _wait_sim(1.0)
+		print("[holo] after taking the job: marker_on=", ben_mod.marker_on(), " fade ", ben_mod.holo_fade)
 		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
