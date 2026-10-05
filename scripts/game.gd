@@ -157,6 +157,7 @@ var handbrake := false
 var store: Node
 var police: Node
 var bar_mod: Node
+var ben_mod: Node
 var amb_base: Color
 var amb_energy: float
 var loaded := false
@@ -177,6 +178,8 @@ func _ready() -> void:
 	police.setup(self)
 	bar_mod = Node.new(); bar_mod.set_script(load("res://scripts/bar.gd")); bar_mod.name = "Bar"; add_child(bar_mod)
 	bar_mod.setup(self)
+	ben_mod = Node.new(); ben_mod.set_script(load("res://scripts/ben.gd")); ben_mod.name = "BenNPC"; add_child(ben_mod)
+	ben_mod.setup(self)
 	menu.start_pressed.connect(start)
 	menu.again_pressed.connect(func(): reset(); _capture(true))
 	menu.menu_pressed.connect(to_main_menu)
@@ -324,6 +327,7 @@ func reset() -> void:
 	if store: store.reset()
 	if police: police.reset()
 	if bar_mod: bar_mod.reset()
+	if ben_mod: ben_mod.reset()
 	gun_reset()
 	beers = 0; minutes = 23 * 60 + 12; has_beer = false; steps = 0; stock = STOCK_START; show_stock()
 	for c in floor_cans: c.queue_free()
@@ -369,6 +373,7 @@ func interact() -> void:
 	if state != "walking": return
 	if store and store.interact(): return
 	if bar_mod and bar_mod.interact(): return
+	if ben_mod and ben_mod.interact(): return
 	if near_car(): enter_car(); return
 	if near_front():
 		front_target = 0.0 if front_target > 0 else 1.0
@@ -672,6 +677,7 @@ func _step_up(hvel: Vector3, dt: float) -> void:
 func _prompts() -> void:
 	var sp: Array = store.prompt() if (store and not peeping) else []
 	if sp.is_empty() and bar_mod and not peeping: sp = bar_mod.prompt()
+	if sp.is_empty() and ben_mod and not peeping: sp = ben_mod.prompt()
 	if peeping: hud.prompt("Open the door")
 	elif not sp.is_empty(): hud.prompt(sp[0], sp[1])
 	elif near_car(): hud.prompt("Get in the car")
@@ -686,6 +692,7 @@ func _prompts() -> void:
 	elif not has_beer and near_fridge(): hud.prompt("Grab a cold one" if stock > 0 else "The fridge is empty", stock > 0)
 	elif has_beer and near_chair(): hud.prompt("Sit down and drink")
 	elif not has_beer and near_chair(): hud.prompt("Get a beer from the fridge first", false)
+	elif ben_mod and ben_mod.hint() != "": hud.prompt(ben_mod.hint(), false)
 	elif is_outside(): hud.prompt("Head back in to the chair" if has_beer else "Head back in. The beer is inside", false)
 	else: hud.prompt("Back to the chair" if has_beer else ("Head to the fridge" if stock > 0 else "The fridge is empty"), false)
 
@@ -706,6 +713,7 @@ func _process(dt: float) -> void:
 	john.grip_w = 1.0 if gun_out() else 0.0
 	if store: store.update(dt)
 	if bar_mod: bar_mod.update(dt)
+	if ben_mod: ben_mod.update(dt)
 	john.apply_pose(clock_t, float(beers) / MAX_BEERS)
 	_update_gun(dt)
 	_update_props(dt)
@@ -1617,6 +1625,41 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		await _wait_sim(0.2); await _shot(prefix, "bi11_street_closed")
 		debug_cam = {pos = W.call(3.0, 1.7, -6.0), at = W.call(-0.5, 1.4, 0.0)}
 		await _wait_sim(0.2); await _shot(prefix, "bi12_street_wide")
+		get_tree().quit(); return
+	if sc == "ben":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(0.9, -42.9); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.15
+		await _wait_sim(0.6)
+		print("[ben] at door: prompt=", ben_mod.prompt(), " st=", ben_mod.st)
+		debug_cam = {pos = Vector3(2.6, 1.3, -40.6), at = Vector3(0.9, 0.9, -44.2)}
+		await _wait_sim(0.2); await _shot(prefix, "ben0_door")
+		interact(); await _wait_sim(3.6)
+		print("[ben] after knock: st=", ben_mod.st, " visible=", ben_mod.ben.visible, " door=", ben_mod.door_open, " ben at ", ben_mod.ben.global_position, " prompt=", ben_mod.prompt())
+		await _shot(prefix, "ben1_answers")
+		interact()
+		for i in 8:
+			await _wait_sim(2.7)
+			if i == 0 or i == 2: await _shot(prefix, "ben2_talk%d" % i)
+		print("[ben] after talk: mission=", ben_mod.mission, " st=", ben_mod.st, " state=", state, " hint=", ben_mod.hint())
+		debug_cam = {}
+		# rob the till (the clerk hands it over at gunpoint)
+		var cash0: float = store.cash
+		store.hands_up(); await _wait_sim(0.5); store.demand_cash(); await _wait_sim(3.0)
+		print("[ben] robbed: haul=", store.haul, " cash ", cash0, " -> ", store.cash, " owed=", ben_mod.owed, " hint=", ben_mod.hint())
+		# walk away so Ben goes in, then come back and knock
+		set_pos2(0.9, -30.0); await _wait_sim(5.0)
+		print("[ben] walked away: st=", ben_mod.st, " visible=", ben_mod.ben.visible)
+		set_pos2(0.9, -42.9); john.facing = PI; await _wait_sim(0.5)
+		interact(); await _wait_sim(3.6)
+		print("[ben] second knock: st=", ben_mod.st, " prompt=", ben_mod.prompt())
+		var c1: float = store.cash
+		interact(); await _wait_sim(10.0)
+		print("[ben] paid: mission=", ben_mod.mission, " cash ", c1, " -> ", store.cash, " state=", state)
+		debug_cam = {pos = Vector3(2.6, 1.3, -40.6), at = Vector3(0.9, 0.9, -44.2)}
+		await _wait_sim(0.2); await _shot(prefix, "ben3_after")
+		debug_cam = {}
+		interact(); await _wait_sim(4.0)
+		print("[ben] talk after: st=", ben_mod.st)
 		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)

@@ -105,6 +105,11 @@ func hostile() -> bool: return rob.clerk != "idle"
 func can_afford(v: float) -> bool: return cash + 1e-9 >= v
 func later(t: float, f: Callable) -> void: g.get_tree().create_timer(t).timeout.connect(f)
 
+## the till's takings go to John; remembered so Ben knows how much there was
+var haul := 0.0
+func take_till() -> void:
+	haul = round(380 + randf() * 340); add_cash(haul); rob.till = false
+
 func add_cash(d: float) -> void:
 	cash = round((cash + d) * 100.0) / 100.0
 	g.hud.set_cash(cash); g.hud.cash_delta(d)
@@ -123,7 +128,7 @@ func hold(on: bool) -> void:
 
 # ------------------------------------------------------------------ reset
 func reset() -> void:
-	cash = START_CASH; g.hud.set_cash(cash)
+	cash = START_CASH; g.hud.set_cash(cash); haul = 0.0
 	hold(false); case_state = "store"; paid = false; g.stock = 0; g.show_stock()
 	lid_t = 0.0; greeted = false; till_open = 0.0
 	if drawer: drawer.position.z = drawer_z0
@@ -263,7 +268,7 @@ func demand_cash() -> void:
 	g.set_state("busy"); g.hud.prompt("")
 	c_say("Here... take it... just go..." if rob.clerk == "hurt" else "Okay, okay! Here, take it all!", 2.4)
 	later(1.9, func():
-		Sfx.play("register"); add_cash(round(380 + randf() * 340)); rob.till = false
+		Sfx.play("register"); take_till()
 		if drawer_cash: drawer_cash.visible = false
 		if rob.clerk == "hands": rob.clerk = "robbed"
 		say("Pleashure doing business." if g.beers >= 3 else "Pleasure doing business.", 2.2); g.set_state("walking")
@@ -282,7 +287,7 @@ func open_till() -> void:
 		g.john.snort_ik.w = 0.0 if t < 0.7 else (g.sm((t - 0.7) / 0.3) if t < 1.0 else (1.0 if t < 1.9 else 1.0 - g.sm((t - 1.9) / 0.5)))
 		g.john.snort_ik.target = dw + Vector3(0, 0.06 + (0.08 if (t > 1.3 and t < 1.9) else 0.0), 0.02)
 		if t > 1.35 and not st.took:
-			st.took = true; Sfx.play("register"); add_cash(round(380 + randf() * 340)); rob.till = false
+			st.took = true; Sfx.play("register"); take_till()
 			if drawer_cash: drawer_cash.visible = false
 	var done := func():
 		g.john.snort_ik.w = 0.0; g.set_state("walking")
