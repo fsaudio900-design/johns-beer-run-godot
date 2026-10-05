@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" path="res://assets/world/JBR_Neighborhood.glb" id="w_hood"]
 [ext_resource type="PackedScene" path="res://assets/world/JBR_Town.glb" id="w_town"]
 [ext_resource type="PackedScene" path="res://assets/world/JBR_FuelStop.glb" id="w_fuel"]
+[ext_resource type="PackedScene" path="res://assets/bar/Bar.glb" id="w_bar"]
 [ext_resource type="PackedScene" path="res://assets/john/john.fbx" id="m_john"]
 [ext_resource type="PackedScene" path="res://assets/cars/m1.glb" id="m_car"]
 [ext_resource type="PackedScene" path="res://assets/chars/Visitor.glb" id="m_visitor"]
@@ -105,6 +106,29 @@ script = ExtResource("s_world")
 [node name="JBR_Town" parent="World" instance=ExtResource("w_town")]
 
 [node name="JBR_FuelStop" parent="World" instance=ExtResource("w_fuel")]
+
+[node name="JBR_Bar" parent="World" instance=ExtResource("w_bar")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -76, -0.38, -33.7)
+
+[node name="Neon" type="OmniLight3D" parent="World/JBR_Bar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.55, 2.0, -1.35)
+light_color = Color(1, 0.25, 0.45, 1)
+light_energy = 2.2
+omni_range = 4.5
+omni_attenuation = 1.4
+
+[node name="FrontLamp" type="OmniLight3D" parent="World/JBR_Bar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.45, 2.3, -0.45)
+light_color = Color(1, 0.82, 0.55, 1)
+light_energy = 2.5
+omni_range = 6.0
+shadow_enabled = true
+
+[node name="BackLamp" type="OmniLight3D" parent="World/JBR_Bar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.57, 2.2, 10.05)
+light_color = Color(1, 0.82, 0.55, 1)
+light_energy = 2.0
+omni_range = 6.0
 
 [node name="Streetlights" type="Node3D" parent="World"]
 

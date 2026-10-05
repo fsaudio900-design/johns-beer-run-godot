@@ -1639,6 +1639,34 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		debug_cam = {pos = Vector3(-46.6, 1.9, -44.4), at = Vector3(-47.6, -0.3, -43.6)}
 		await _wait_sim(0.1); await _shot(prefix, "c7_cashier_ragdoll")
 		get_tree().quit(); return
+	if sc == "bar":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		set_pos2(-73.0, -31.0); john.global_position.y = -0.3; john.facing = PI; yaw = 0.0; pitch = 0.15
+		await _wait_sim(0.6)
+		await _shot(prefix, "b0_game_cam")
+		var shots := {b1_across_street = [Vector3(-71, 1.7, -22.5), Vector3(-76, 2.4, -34)], b2_sidewalk = [Vector3(-66.5, 1.6, -31.2), Vector3(-77, 2.0, -34)],
+			b3_side = [Vector3(-62.5, 2.0, -40), Vector3(-72, 2.2, -38)], b4_back = [Vector3(-77, 1.8, -51.5), Vector3(-76, 1.8, -43.4)],
+			b5_back_corner = [Vector3(-66, 2.5, -50), Vector3(-75, 2.0, -42)], b6_roof = [Vector3(-68, 11, -48), Vector3(-76, 4.5, -38.5)],
+			b7_neon = [Vector3(-75.0, 1.8, -30.6), Vector3(-74.5, 2.0, -33.5)]}
+		for k in shots:
+			debug_cam = {pos = shots[k][0], at = shots[k][1]}
+			await _wait_sim(0.15); await _shot(prefix, k)
+		debug_cam = {}
+		# walk John straight at the facade: the wall must stop him
+		set_pos2(-73.0, -31.5); john.facing = PI
+		var z0 := john.global_position.z
+		for k in 40:
+			john.velocity = Vector3(0, -0.5, -2.0); john.move_and_slide(); await get_tree().physics_frame
+		print("[bar] walked into the facade: z ", z0, " -> ", john.global_position.z, " (facade at -33.7)")
+		set_pos2(-66.0, -38.5); john.facing = -PI / 2
+		for k in 200:
+			john.velocity = Vector3(-2.0, -0.5, 0); john.move_and_slide(); await get_tree().physics_frame
+		print("[bar] walked into the side wall: x -> ", john.global_position.x, " (wall at -70.45)")
+		set_pos2(-76.0, -47.0); john.facing = 0.0
+		for k in 200:
+			john.velocity = Vector3(0, -0.5, 2.0); john.move_and_slide(); await get_tree().physics_frame
+		print("[bar] walked into the back wall: z -> ", john.global_position.z, " (wall at -43.3)")
+		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
 		set_pos2(-57.4, -49.6); john.global_position.y = -0.3

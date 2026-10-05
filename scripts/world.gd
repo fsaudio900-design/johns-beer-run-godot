@@ -2,7 +2,7 @@ extends Node3D
 ## Loads the exported world (cabin, cul-de-sac, town, fuel stop, terrain), gives every
 ## solid mesh a collision body, tunes the imported lights and spawns John in his cabin.
 
-const WORLD := ["JBR_Terrain", "JBR_Cabin", "JBR_Neighborhood", "JBR_Town", "JBR_FuelStop"]
+const WORLD := ["JBR_Terrain", "JBR_Cabin", "JBR_Neighborhood", "JBR_Town", "JBR_FuelStop", "JBR_Bar"]
 const SPAWN := Vector3(-2.0, 0.05, 1.85)
 const LIGHT_SCALE := 0.9           # three.js intensities -> Godot energy (Godot omni falloff is steeper)
 const MIN_COLLIDE := 0.18          # skip collision on tiny props (cans, bottles, products)
