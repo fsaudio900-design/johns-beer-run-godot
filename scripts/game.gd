@@ -111,10 +111,7 @@ var puff_tex: Texture2D = preload("res://assets/fx/puff.png")
 var glow_tex: Texture2D = preload("res://assets/fx/glow_add.png")
 var out_mix := 0.0
 var cat_tex: Texture2D = preload("res://assets/fx/cat.png")
-# ---- stage 3: the visitor + front door peephole ----
-var visitor: Node3D
-var V := {st = "off", path = [], pi = 0, spd = 1.25, knocks = 0, knock_t = 0.0, talk = [], talk_t = 0.0, talk_i = 0, seen_peep = false, said_knock = false, y = 0.0}
-var game_t := 0.0
+# ---- the front door peephole ----
 var peeping := false
 var peep_vis := 0.0
 var peep_yaw := 0.0
@@ -180,10 +177,6 @@ func _ready() -> void:
 	police.setup(self)
 	bar_mod = Node.new(); bar_mod.set_script(load("res://scripts/bar.gd")); bar_mod.name = "Bar"; add_child(bar_mod)
 	bar_mod.setup(self)
-	visitor = get_node_or_null("Visitor")
-	if visitor == null:
-		visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"; add_child(visitor)
-	visitor.visible = false
 	menu.start_pressed.connect(start)
 	menu.again_pressed.connect(func(): reset(); _capture(true))
 	menu.menu_pressed.connect(to_main_menu)
@@ -325,7 +318,7 @@ func _capture(on: bool) -> void:
 
 func reset() -> void:
 	door_target = 0; door_open = 0; front_target = 0; front_open = 0
-	visitor_reset()
+	peeping = false; peep_vis = 0.0; peep_said = false
 	if car: car.park(); handbrake = false
 	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false; hud.set_speed(-1)
 	if store: store.reset()
@@ -684,7 +677,7 @@ func _prompts() -> void:
 	elif near_car(): hud.prompt("Get in the car")
 	elif near_front():
 		var inside := not is_outside()
-		hud.prompt("Answer the door" if (visitor_waiting() and front_target == 0 and inside) else ("Close the front door" if front_target > 0 else "Open the front door"), true, front_target == 0 and inside)
+		hud.prompt("Close the front door" if front_target > 0 else "Open the front door", true, front_target == 0 and inside)
 	elif near_door(): hud.prompt("Close the door" if door_target > 0 else "Open the bathroom door")
 	elif near_toilet(): hud.prompt("Flush the toilet")
 	elif can_take_gun(): hud.prompt("Pick up the Glock")
@@ -743,7 +736,6 @@ func _process(dt: float) -> void:
 	if n.has("BathDoor"): (n.BathDoor as Node3D).rotation.y = rest_rot.BathDoor.y - door_open * 1.7
 	front_open = lerp(front_open, front_target, 1.0 - exp(-dt * 4))
 	if n.has("FrontDoor"): (n.FrontDoor as Node3D).rotation.y = rest_rot.FrontDoor.y - front_open * 1.55
-	update_visitor(dt)
 	if peeping and state != "walking": toggle_peep(false)
 	peep_vis = lerp(peep_vis, 1.0 if peeping else 0.0, 1.0 - exp(-dt * 14))
 	if peep_vis < 0.01 and not peeping: peep_vis = 0.0
@@ -963,114 +955,21 @@ func _update_camera(dt: float) -> void:
 		cam.rotation = Vector3(peep_pitch - 0.05 + sin(clock_t * 0.6) * 0.02 * b, peep_yaw + sin(clock_t * 0.8) * 0.03 * b, 0)
 		cam.fov = 112
 
-# ------------------------------------------------------------------ stage 3: visitor + peephole
-func visitor_waiting() -> bool: return V.st == "knock"
-func visitor_near_door() -> bool: return V.st == "knock" or V.st == "talk"
-
-func visitor_reset() -> void:
-	V.st = "off"; V.path = []; V.pi = 0; V.knocks = 0; V.knock_t = 0.0; V.talk = []; V.seen_peep = false; V.said_knock = false
-	if visitor: visitor.visible = false; visitor.set_anim("idle")
-	game_t = 0.0; peeping = false; peep_vis = 0.0; peep_said = false
-
-func v_say(text: String, secs := 3.0) -> void: hud.say("Visitor", text, secs)
-
-func _vpath(arr: Array) -> Array:
-	var out := []
-	for p in arr: out.append(Vector3(p[0], 0, p[2]))
-	return out
-
-func visitor_start() -> void:
-	V.st = "approach"; V.path = _vpath(VisitorPaths.PATH_IN); V.pi = 1
-	visitor.global_position = V.path[0]; V.y = _ground(V.path[0]); visitor.visible = true; visitor.set_anim("walk")
-
-func start_talk() -> void:
-	V.st = "talk"; V.talk_t = 0.0; V.talk_i = 0; visitor.set_anim("idle")
-	var slurred := beers >= 3
-	V.talk = [[0.6, "V", "Oh! Good evening. Sorry to knock so late."],
-		[3.8, "V", "I'm looking for number 14. My cousin Avi's place?"],
-		[7.4, "J", "Thish is forty-one. Fourteen'sh... acrosh the circle." if slurred else "This is 41. Fourteen's right across the circle."],
-		[11.0, "V", "Across the circle. Of course, I had it backwards. Thank you!"],
-		[14.4, "V", "Enjoy the game. Good night!", "wave"],
-		[17.2, "leave"]]
-
-func visitor_leave() -> void:
-	V.st = "leave"; V.path = _vpath(VisitorPaths.PATH_OUT); V.pi = 0; visitor.set_anim("walk")
-
+# ------------------------------------------------------------------ the peephole
 func _ground(p: Vector3) -> float:
 	var q := PhysicsRayQueryParameters3D.create(Vector3(p.x, p.y + 2.0, p.z), Vector3(p.x, p.y - 3.0, p.z))
 	q.exclude = [john.get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	return hit.position.y if hit else p.y
 
-func update_visitor(dt: float) -> void:
-	if visitor == null: return
-	if state != "title" and state != "end": game_t += dt
-	if V.st == "off":
-		if game_t >= 28 and state != "title" and state != "end" and state != "passout": visitor_start()
-		return
-	if V.st == "gone": visitor.visible = false; return
-	var o := visitor
-	var jp := john.global_position
-	if V.st == "approach" or V.st == "leave" or V.st == "step":
-		if V.pi >= V.path.size():
-			if V.st == "approach":
-				if front_open > 0.5: start_talk()
-				else: V.st = "knock"; V.knock_t = 1.2; visitor.set_anim("idle")
-			elif V.st == "step": start_talk()
-			else: V.st = "gone"; o.visible = false
-		else:
-			var tgt: Vector3 = V.path[V.pi]
-			var dx := tgt.x - o.global_position.x; var dz := tgt.z - o.global_position.z; var d := Vector2(dx, dz).length()
-			var st: float = (0.6 if V.st == "step" else V.spd) * dt
-			if d <= st:
-				o.global_position.x = tgt.x; o.global_position.z = tgt.z; V.pi += 1
-			else:
-				o.global_position.x += dx / d * st; o.global_position.z += dz / d * st
-			var want := 0.0 if V.st == "step" else atan2(dx, dz)
-			o.rotation.y = lerp_angle(o.rotation.y, want, 1.0 - exp(-dt * 8))
-	else:
-		var close := is_outside() and Vector2(jp.x - o.global_position.x, jp.z - o.global_position.z).length() < 4
-		o.rotation.y = lerp_angle(o.rotation.y, atan2(jp.x - o.global_position.x, jp.z - o.global_position.z) if close else 0.0, 1.0 - exp(-dt * 6))
-	if V.st == "knock":
-		V.knock_t -= dt
-		if front_open > 0.45 or (is_outside() and Vector2(jp.x - o.global_position.x, jp.z - o.global_position.z).length() < 3.5):
-			V.st = "step"; V.path = [Vector3(VisitorPaths.TALK[0], 0, VisitorPaths.TALK[2])]; V.pi = 0; visitor.set_anim("idle")
-		elif V.knock_t <= 0:
-			if V.knocks >= 5 or state == "passout":
-				v_say("Hello? ...I'll come back another time." if state == "passout" else "Hello? ...Huh. Maybe it's the house across the circle.", 3.6)
-				visitor_leave()
-			else:
-				V.knocks += 1; V.knock_t = 7.5; visitor.set_anim("knock"); Sfx.play("knock")
-				get_tree().create_timer(2.1).timeout.connect(func(): if visitor.anim == "knock": visitor.set_anim("idle"))
-				if not V.said_knock:
-					V.said_knock = true
-					get_tree().create_timer(1.5).timeout.connect(func(): say("Who the hell's knocking at this hour?" if state == "sitting" else "Someone's at the front door?", 3.0))
-				elif V.knocks == 3:
-					get_tree().create_timer(1.5).timeout.connect(func(): say("Somebody really wants in.", 2.4))
-	if V.st == "talk":
-		V.talk_t += dt
-		if V.talk_i < V.talk.size():
-			var ln: Array = V.talk[V.talk_i]
-			if V.talk_t >= ln[0]:
-				V.talk_i += 1
-				if ln[1] == "leave": visitor.set_anim("idle"); visitor_leave()
-				elif ln[1] == "V": v_say(ln[2], 3.3); visitor.set_anim("wave" if ln.size() > 3 and ln[3] == "wave" else "idle")
-				else: say(ln[2], 3.3)
-	var gy := _ground(o.global_position)
-	V.y = lerp(V.y, gy, 1.0 - exp(-dt * 10)); o.global_position.y = V.y
-	visitor.pose(dt)
-
 func toggle_peep(on: bool) -> void:
 	if on == peeping: return
 	peeping = on
 	if on:
 		peep_yaw = 0.0; peep_pitch = 0.0; Sfx.play("thunk")
-		if not peep_said and V.st != "knock" and V.st != "talk":
+		if not peep_said:
 			peep_said = true
-			get_tree().create_timer(0.7).timeout.connect(func(): if peeping and V.st != "knock": say("Nobody. Just the cul-de-sac.", 2.4))
-		if V.st == "knock" and not V.seen_peep:
-			V.seen_peep = true
-			get_tree().create_timer(0.7).timeout.connect(func(): if peeping: say("Some guy in a hat and a suit. At this hour?", 3.0))
+			get_tree().create_timer(0.7).timeout.connect(func(): if peeping: say("Nobody. Just the cul-de-sac.", 2.4))
 
 # ------------------------------------------------------------------ stage 4: the Glock
 func _build_gun() -> void:
@@ -1448,13 +1347,6 @@ func _update_car(dt: float) -> void:
 		back = 1.0 if Input.is_action_pressed("move_back") else 0.0
 		st = (1.0 if Input.is_action_pressed("move_left") else 0.0) - (1.0 if Input.is_action_pressed("move_right") else 0.0)
 	car.drive(dt, driving, thr, back, st, handbrake, drunk_level(), boost_t > 0, clock_t)
-	# the visitor is solid to the car (he is still invincible)
-	if visitor and visitor.visible:
-		var d := Vector2(car.global_position.x - visitor.global_position.x, car.global_position.z - visitor.global_position.z)
-		if d.length() < 1.6 and d.length() > 0.01:
-			var push := d.normalized() * (1.6 - d.length())
-			car.global_position += Vector3(push.x, 0, push.y)
-			if abs(car.v) > 0.5: car.v *= -0.25
 	Sfx.engine(driving, abs(car.v), thr, dt)
 	if driving:
 		john.global_position = car.global_position; john.facing = car.h
@@ -1524,21 +1416,16 @@ func _test_shot(from: Vector3, at: Vector3) -> void:
 func _run_scenario(sc: String, prefix: String) -> void:
 	debug_run = true
 	await _wait_sim(0.5)
-	if sc == "visitor":
+	if sc == "peephole":
 		start(); await _wait_sim(0.5)
 		interact(); await _wait_sim(1.8)
 		set_pos2(FD_X, -RZ + 0.9); john.facing = PI; yaw = 0.0
-		game_t = 28.0; V.spd = 9.0
-		while V.st != "knock": await _wait_sim(0.2)
-		await _wait_sim(1.5)
-		await _shot(prefix, "1_knock")
-		toggle_peep(true); await _wait_sim(0.8)
-		await _shot(prefix, "2_peephole")
-		interact(); await _wait_sim(4.5)
-		await _shot(prefix, "3_talk")
-		set_pos2(FD_X + 0.3, -RZ - 2.2); john.facing = 0.0; yaw = PI + 0.4; pitch = 0.25
-		await _wait_sim(1.0)
-		await _shot(prefix, "4_outside")
+		await _wait_sim(40.0)        # the visitor used to come at 28 s: nobody should come now
+		print("[peephole] prompt check, front_target=", front_target, " nodes named Visitor: ", get_tree().root.find_children("Visitor", "", true, false).size())
+		toggle_peep(true); await _wait_sim(1.2)
+		await _shot(prefix, "1_peephole")
+		interact(); await _wait_sim(1.5)
+		print("[peephole] door opened from the peephole: front_target=", front_target, " peeping=", peeping)
 		get_tree().quit(); return
 	if sc == "gun":
 		start(); await _wait_sim(0.5)

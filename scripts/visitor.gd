@@ -1,11 +1,9 @@
 extends Node3D
-## The procedural "visitor" rig exported from the web build (also reused later for Dale the
-## clerk and the officer). Joints are the J_* nodes; pose() is a port of the web animation:
-## idle breathing, walk cycle, knocking, waving and hands-up.
-##
-## The visitor himself is invincible: he is never added to any shootable group.
+## The procedural character rig exported from the web build (it first drove the late-night
+## visitor, removed in v2.15; now it runs the clerk and the officers). Joints are the J_* nodes;
+## pose() is a port of the web animation: idle breathing, walk cycle, knocking, waving and hands-up.
 
-@export var model_path := "res://assets/chars/Visitor.glb"
+@export var model_path := "res://assets/chars/Officer.glb"
 @export var skin_path := ""          # optional skinned character worn over the procedural rig
 var skin: SkinDriver
 var J := {}

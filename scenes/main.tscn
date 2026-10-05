@@ -6,7 +6,6 @@
 [ext_resource type="Script" path="res://scripts/hud.gd" id="s_hud"]
 [ext_resource type="Script" path="res://scripts/menu.gd" id="s_menu"]
 [ext_resource type="Script" path="res://scripts/car.gd" id="s_car"]
-[ext_resource type="Script" path="res://scripts/visitor.gd" id="s_visitor"]
 [ext_resource type="Shader" path="res://scripts/post.gdshader" id="sh_post"]
 [ext_resource type="Texture2D" path="res://assets/fx/glow_add.png" id="t_glow"]
 [ext_resource type="PackedScene" path="res://assets/world/JBR_Terrain.glb" id="w_terrain"]
@@ -18,7 +17,6 @@
 [ext_resource type="PackedScene" path="res://assets/bar/BarInterior.glb" id="w_bar_in"]
 [ext_resource type="PackedScene" path="res://assets/john/john.fbx" id="m_john"]
 [ext_resource type="PackedScene" path="res://assets/cars/m1.glb" id="m_car"]
-[ext_resource type="PackedScene" path="res://assets/chars/Visitor.glb" id="m_visitor"]
 [ext_resource type="ArrayMesh" path="res://assets/glock/glock_mesh.res" id="m_glock"]
 [ext_resource type="Texture2D" path="res://assets/glock/glock_BaseColor.jpg" id="t_gc"]
 [ext_resource type="Texture2D" path="res://assets/glock/glock_Normal.jpg" id="t_gn"]
@@ -370,12 +368,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
 shape = SubResource("carbox")
 
 [node name="m1" parent="M1" instance=ExtResource("m_car")]
-
-[node name="Visitor" type="Node3D" parent="."]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 1.02, -0.45, -6.0)
-script = ExtResource("s_visitor")
-
-[node name="Model" parent="Visitor" instance=ExtResource("m_visitor")]
 
 [node name="Glock" type="Node3D" parent="."]
 transform = Transform3D(-2.71714e-08, -0.62161, 0.783327, 1, -4.37114e-08, 0, 3.42403e-08, 0.783327, 0.62161, -3.08, 0.658, 2.46)
