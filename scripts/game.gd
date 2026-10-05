@@ -159,6 +159,7 @@ var handbrake := false
 # ---- stage 6: the Fuel Stop ----
 var store: Node
 var police: Node
+var bar_mod: Node
 var amb_base: Color
 var amb_energy: float
 var loaded := false
@@ -177,6 +178,8 @@ func _ready() -> void:
 	store.setup(self)
 	police = Node.new(); police.set_script(load("res://scripts/police.gd")); police.name = "Police"; add_child(police)
 	police.setup(self)
+	bar_mod = Node.new(); bar_mod.set_script(load("res://scripts/bar.gd")); bar_mod.name = "Bar"; add_child(bar_mod)
+	bar_mod.setup(self)
 	visitor = get_node_or_null("Visitor")
 	if visitor == null:
 		visitor = Node3D.new(); visitor.set_script(load("res://scripts/visitor.gd")); visitor.name = "Visitor"; add_child(visitor)
@@ -327,6 +330,7 @@ func reset() -> void:
 	john.visible = true; (john.get_node("Collision") as CollisionShape3D).disabled = false; hud.set_speed(-1)
 	if store: store.reset()
 	if police: police.reset()
+	if bar_mod: bar_mod.reset()
 	gun_reset()
 	beers = 0; minutes = 23 * 60 + 12; has_beer = false; steps = 0; stock = STOCK_START; show_stock()
 	for c in floor_cans: c.queue_free()
@@ -371,6 +375,7 @@ func interact() -> void:
 	if state == "sitting" and tw == null: stand_up(); return
 	if state != "walking": return
 	if store and store.interact(): return
+	if bar_mod and bar_mod.interact(): return
 	if near_car(): enter_car(); return
 	if near_front():
 		front_target = 0.0 if front_target > 0 else 1.0
@@ -673,6 +678,7 @@ func _step_up(hvel: Vector3, dt: float) -> void:
 
 func _prompts() -> void:
 	var sp: Array = store.prompt() if (store and not peeping) else []
+	if sp.is_empty() and bar_mod and not peeping: sp = bar_mod.prompt()
 	if peeping: hud.prompt("Open the door")
 	elif not sp.is_empty(): hud.prompt(sp[0], sp[1])
 	elif near_car(): hud.prompt("Get in the car")
@@ -706,6 +712,7 @@ func _process(dt: float) -> void:
 	# ---- John's pose + held props
 	john.grip_w = 1.0 if gun_out() else 0.0
 	if store: store.update(dt)
+	if bar_mod: bar_mod.update(dt)
 	john.apply_pose(clock_t, float(beers) / MAX_BEERS)
 	_update_gun(dt)
 	_update_props(dt)
@@ -938,6 +945,7 @@ func _update_camera(dt: float) -> void:
 		want_pos.z = min(want_pos.z, -RZ - 0.5)
 	else:
 		want_pos = Vector3(clamp(want_pos.x, -6.45, 6.45), clamp(want_pos.y, 0.4, 3.15), clamp(want_pos.z, -4.45, 4.45))
+	if bar_mod and bar_mod.inside(): want_pos = bar_mod.clamp_cam(want_pos)
 	cam.global_position = cam.global_position.lerp(want_pos, 1.0 - exp(-dt * 6))
 	john.model.visible = state != "driving" and cam.global_position.distance_to(head) > 0.55
 	cam_target = cam_target.lerp(tgt, 1.0 - exp(-dt * 8))
@@ -1666,6 +1674,62 @@ func _run_scenario(sc: String, prefix: String) -> void:
 		for k in 200:
 			john.velocity = Vector3(0, -0.5, 2.0); john.move_and_slide(); await get_tree().physics_frame
 		print("[bar] walked into the back wall: z -> ", john.global_position.z, " (wall at -43.3)")
+		get_tree().quit(); return
+	if sc == "barin":
+		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)
+		var BB: Node3D = world.get_node("JBR_Bar")
+		var W := func(x: float, y: float, z: float) -> Vector3: return BB.global_transform * Vector3(x, y, z)
+		var LP := func() -> Vector3: return bar_mod.jl().snapped(Vector3(0.01, 0.01, 0.01))
+		var p0: Vector3 = W.call(-0.17, 0.0, -1.0)
+		set_pos2(p0.x, p0.z); john.global_position.y = p0.y + 0.05; john.facing = PI; yaw = 0.0; pitch = 0.12
+		await _wait_sim(0.6)
+		for sk: Skeleton3D in get_tree().root.find_children("*", "Skeleton3D", true, false):
+			var lp: Vector3 = BB.to_local(sk.global_position)
+			if abs(lp.x) < 7 and lp.z > -3 and lp.z < 11 and sk.is_visible_in_tree(): print("[barin] skeleton near the bar: ", sk.get_path(), " local ", lp.snapped(Vector3(0.1, 0.1, 0.1)))
+		print("[barin] outside: local ", LP.call(), " near_door=", bar_mod.near_door(), " prompt=", bar_mod.prompt(), " inside=", bar_mod.inside())
+		await _shot(prefix, "bi0_outside_closed")
+		interact(); await _wait_sim(1.6)
+		print("[barin] after E: open=", bar_mod.open, " door rot=", bar_mod.door.rotation.y, " prompt=", bar_mod.prompt())
+		await _shot(prefix, "bi1_open")
+		for k in 150:
+			john.velocity = Vector3(0, -0.5, -1.6); john.move_and_slide(); await get_tree().physics_frame
+		print("[barin] walked in: local ", LP.call(), " inside=", bar_mod.inside())
+		await _wait_sim(0.8); await _shot(prefix, "bi2_walked_in")
+		var shots := {bi3_from_door = [W.call(0.7, 1.7, 0.9), W.call(-2.6, 1.1, 6.0)], bi4_bar = [W.call(-3.0, 1.65, -0.95), W.call(-4.3, 1.2, 5.0)],
+			bi5_pool = [W.call(2.6, 2.0, 7.6), W.call(0.3, 0.8, 4.4)], bi6_booths = [W.call(0.4, 1.6, 3.2), W.call(-0.4, 1.0, 9.2)],
+			bi7_to_front = [W.call(-1.2, 1.7, 8.2), W.call(0.0, 1.4, 0.3)], bi8_jukebox = [W.call(1.2, 1.5, 7.2), W.call(3.0, 1.0, 4.3)],
+			bi9_backbar = [W.call(-2.9, 1.5, 3.4), W.call(-5.3, 1.6, 2.2)]}
+		for k in shots:
+			debug_cam = {pos = shots[k][0], at = shots[k][1]}
+			await _wait_sim(0.2); await _shot(prefix, k)
+		debug_cam = {}
+		# stand in the doorway and try to shut the door on yourself
+		var p1: Vector3 = W.call(-0.17, 0.0, 0.45); set_pos2(p1.x, p1.z); await _wait_sim(0.3)
+		interact(); await _wait_sim(0.5)
+		print("[barin] close while in doorway: target=", bar_mod.target, " (should stay 1)")
+		var p2: Vector3 = W.call(-0.17, 0.0, 1.15); set_pos2(p2.x, p2.z); await _wait_sim(0.3)
+		print("[barin] inside by the door: prompt=", bar_mod.prompt(), " inside=", bar_mod.inside())
+		interact(); await _wait_sim(1.8)
+		print("[barin] closed: open=", bar_mod.open)
+		debug_cam = {pos = W.call(0.9, 1.6, 3.4), at = W.call(-0.17, 1.1, 0.0)}
+		await _wait_sim(0.2); await _shot(prefix, "bi10_closed_inside")
+		debug_cam = {}
+		# walk into the shut door from inside: it must stop John
+		john.facing = 0.0
+		for k in 120:
+			john.velocity = Vector3(0, -0.5, 1.6); john.move_and_slide(); await get_tree().physics_frame
+		print("[barin] walked into the shut door: local ", LP.call(), " (door at z 0)")
+		# outside again: the street must look as before
+		interact(); await _wait_sim(1.6)
+		for k in 55:
+			john.velocity = Vector3(0, -0.5, 1.6); john.move_and_slide(); await get_tree().physics_frame
+		print("[barin] walked out: local ", LP.call(), " inside=", bar_mod.inside())
+		interact(); await _wait_sim(1.6)
+		print("[barin] shut from outside: open=", bar_mod.open)
+		debug_cam = {pos = W.call(0.6, 1.6, -3.6), at = W.call(-0.17, 1.2, 0.0)}
+		await _wait_sim(0.2); await _shot(prefix, "bi11_street_closed")
+		debug_cam = {pos = W.call(3.0, 1.7, -6.0), at = W.call(-0.5, 1.4, 0.0)}
+		await _wait_sim(0.2); await _shot(prefix, "bi12_street_wide")
 		get_tree().quit(); return
 	if sc == "shelves":
 		start(); await _wait_sim(0.3); interact(); await _wait_sim(1.8)

@@ -35,7 +35,7 @@ func _prepare(root: Node) -> int:
 	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
 		if mi.mesh == null or not mi.is_visible_in_tree(): continue
 		var nm := String(mi.name).to_lower()
-		if nm.contains("baked") or nm.contains("glow") or nm.contains("sprite") or nm.contains("can"): continue
+		if nm.contains("baked") or nm.contains("nocol") or nm.contains("glow") or nm.contains("sprite") or nm.contains("can"): continue
 		if _under(mi, "JBR_Bong") or _under(mi, "JBR_PowderLine") or _under(mi, "JBR_TableBill") or _under(mi, "JBR_TVScreen"): continue
 		if _unlit(mi):
 			_make_additive(mi)   # three.js glow sprites lose additive blending in glTF

@@ -192,12 +192,61 @@ if not STREET:
     # drop the road strip and the curb (everything flat and low in front of the sidewalk)
     tp = Pw[Iw]; low = (tp[:, :, 1].max(1) < 0.6) & (tp[:, :, 2].max(1) < 3.2)
     Iw = Iw[~low]
-facade = Prim('walls_atlas'); facade.add_raw(Pw, Nw, Uw, Iw.reshape(-1))
-
-# ---------------------------------------------------------------- back entrance: copies of the facade's own pieces
+# the front door's slab and handle are cut out into their own node (BarDoor) so the game can swing
+# the door open; the rest of the facade stays as it is
+DOOR_HINGE = np.array([0.258, 0.0, 0.0015])            # metres, bar frame: the hinge edge, mid-slab
+Pm = (Pw - np.array([OX, 0, OZ])) * S
+tmn = Pm[Iw].min(1); tmx = Pm[Iw].max(1)
+slab = (tmn[:, 0] > -0.594) & (tmx[:, 0] < 0.26) & (tmn[:, 2] > -0.0215) & (tmx[:, 2] < -0.0205) & (tmx[:, 1] < 2.14)
+knob = (tmn[:, 0] > -0.57) & (tmx[:, 0] < -0.36) & (tmn[:, 1] > 0.97) & (tmx[:, 1] < 1.08) & (tmn[:, 2] > -0.12) & (tmx[:, 2] < -0.019)
+assert slab.sum() == 2, slab.sum()
 def take(P, N, U, I, sel_tri):
     T = I[sel_tri]; idx, inv = np.unique(T.reshape(-1), return_inverse=True)
     return P[idx], N[idx], U[idx], inv
+# the facade's lower wall sheet runs on behind the door: cut the doorway out of it
+big = (tmn[:, 0] < -1.8) & (tmx[:, 0] > 5.5) & (np.abs(tmn[:, 2]) < 0.002) & (np.abs(tmx[:, 2]) < 0.002) & (tmx[:, 1] < 2.9)
+assert big.sum() == 2, big.sum()
+facade = Prim('walls_atlas'); facade.add_raw(Pw, Nw, Uw, Iw[~(slab | knob | big)].reshape(-1))
+t0 = Iw[np.nonzero(big)[0][0]]
+A = np.c_[Pm[t0][:, :2], np.ones(3)]; uvA = np.linalg.solve(A, Uw[t0])        # uv = [x y 1] @ uvA (metres)
+qx0, qx1 = Pm[Iw[big]][..., 0].min(), Pm[Iw[big]][..., 0].max(); qy0, qy1 = Pm[Iw[big]][..., 1].min(), Pm[Iw[big]][..., 1].max()
+def model(x, y, z=0.0): return np.array([x / S + OX, y / S, z / S + OZ])
+def wall_rect(x0, x1, y0, y1):
+    cs = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    facade.quad(*[model(x, y) for x, y in cs], [0, 0, -1], *[np.array([x, y, 1.0]) @ uvA for x, y in cs])
+DX0, DX1, DY1 = -0.592, 0.258, 2.134
+wall_rect(qx0, DX0, qy0, qy1); wall_rect(DX1, qx1, qy0, qy1); wall_rect(DX0, DX1, DY1, qy1)
+# and carry the door frame's jambs on through the wall to meet the room's lining
+Tm = Pm[Iw]
+jamb = (tmn[:, 2] < -0.08) & (tmn[:, 2] > -0.084) & (tmx[:, 2] > -0.0215) & (tmx[:, 2] < -0.020) & (
+    np.all(np.abs(Tm[:, :, 0] - DX1) < 0.002, 1) | np.all(np.abs(Tm[:, :, 0] - DX0) < 0.002, 1) | np.all(np.abs(Tm[:, :, 1] - DY1) < 0.002, 1))
+Pj, Nj, Uj, Ij = take(Pw, Nw, Uw, Iw, jamb)
+facade.add_raw(Pj + np.array([0, 0, 0.06 / S]), Nj, Uj, Ij)
+print('doorway: cut wall sheet, %d jamb triangles extended' % jamb.sum())
+door_m = Prim('walls_atlas')           # in metres, relative to the hinge
+def _rel(P): return (np.asarray(P) - np.array([OX, 0, OZ])) * S - DOOR_HINGE
+Ps, Ns, Us, Is = take(Pw, Nw, Uw, Iw, slab | knob)
+door_m.add_raw(_rel(Ps), Ns, Us, Is)
+# the inside of the door: the slab's face mirrored (same paint and panels), its handle mirrored through the slab
+Pk, Nk, Uk, Ik = take(Pw, Nw, Uw, Iw, knob)
+Pk = _rel(Pk); Pk[:, 2] = -Pk[:, 2]; Nk = Nk.copy(); Nk[:, 2] = -Nk[:, 2]
+door_m.add_raw(Pk, Nk, Uk, Ik.reshape(-1, 3)[:, [0, 2, 1]].reshape(-1))
+sv = np.unique(Iw[slab].reshape(-1)); SP = Pm[sv]; SU = Uw[sv]
+x0, x1 = SP[:, 0].min(), SP[:, 0].max(); y0, y1 = SP[:, 1].min(), SP[:, 1].max()
+def uv_at(x, y):     # the slab's UV at a point of its face (its corners are the rectangle's)
+    k = np.argmin(np.abs(SP[:, 0] - x) + np.abs(SP[:, 1] - y)); return SU[k]
+zf, zb = -0.021 - DOOR_HINGE[2], 0.024 - DOOR_HINGE[2]
+H0 = DOOR_HINGE
+c = [np.array([x, y, 0.0]) - [H0[0], H0[1], 0] for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
+xm = x0 + x1
+door_m.quad(c[0] + [0, 0, zb], c[1] + [0, 0, zb], c[2] + [0, 0, zb], c[3] + [0, 0, zb], [0, 0, 1],
+            uv_at(xm - x0, y0), uv_at(xm - x1, y0), uv_at(xm - x1, y1), uv_at(xm - x0, y1))
+for i in range(4):     # the four edges
+    a, b = c[i], c[(i + 1) % 4]; n = np.cross(b - a, [0, 0, 1]); n = n / np.linalg.norm(n)
+    u = uv_at(x0 + 0.02, y0 + 0.5)
+    door_m.quad(a + [0, 0, zf], b + [0, 0, zf], b + [0, 0, zb], a + [0, 0, zb], -n if np.dot(-n, (a + b) / 2 - (c[0] + c[2]) / 2) > 0 else n, u, u, u, u)
+
+# ---------------------------------------------------------------- back entrance: copies of the facade's own pieces
 def place(P, N, src, dst, shift=(0, 0, 0)):
     """turn a piece from the front (facing -Z at z=src[2]) round to the back wall (facing +Z)"""
     P2 = P.copy(); N2 = N.copy()
@@ -320,16 +369,16 @@ MATS = {
     'decal': dict(name='Bar_Tag', pbrMetallicRoughness=dict(baseColorTexture=tex('tag', True), metallicFactor=0.0, roughnessFactor=0.85), alphaMode='BLEND'),
 }
 mat_list = list(MATS); mat_ix = {m: i for i, m in enumerate(mat_list)}
-gl_prims = []
-for p in prims:
-    if not p.I: continue
-    P = (np.array(p.P, np.float32) - np.array([OX, 0, OZ], np.float32)) * S
+def gl_prim(p, metres=False):
+    P = np.array(p.P, np.float32) if metres else (np.array(p.P, np.float32) - np.array([OX, 0, OZ], np.float32)) * S
     N = np.array(p.N, np.float32); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
     U = np.array(p.U, np.float32)
     attrs = dict(POSITION=push(P, 5126, 'VEC3', 34962, True), NORMAL=push(N, 5126, 'VEC3', 34962), TEXCOORD_0=push(U, 5126, 'VEC2', 34962))
-    gl_prims.append(dict(attributes=attrs, indices=push(np.array(p.I, np.uint32), 5125, 'SCALAR', 34963), material=mat_ix[p.mat], mode=4))
-g = dict(asset=dict(version='2.0', generator='JBR build_bar.py'), scene=0, scenes=[dict(nodes=[0])],
-         nodes=[dict(name='Bar', mesh=0)], meshes=[dict(name='Bar', primitives=gl_prims)],
+    return dict(attributes=attrs, indices=push(np.array(p.I, np.uint32), 5125, 'SCALAR', 34963), material=mat_ix[p.mat], mode=4)
+gl_prims = [gl_prim(p) for p in prims if p.I]
+g = dict(asset=dict(version='2.0', generator='JBR build_bar.py'), scene=0, scenes=[dict(nodes=[0, 1])],
+         nodes=[dict(name='Bar', mesh=0), dict(name='BarDoor', mesh=1, translation=DOOR_HINGE.tolist())],
+         meshes=[dict(name='Bar', primitives=gl_prims), dict(name='BarDoor', primitives=[gl_prim(door_m, True)])],
          materials=[MATS[m] for m in mat_list], textures=textures, images=images,
          samplers=[dict(magFilter=9729, minFilter=9987, wrapS=10497, wrapT=10497), dict(magFilter=9729, minFilter=9987, wrapS=33071, wrapT=33071)],
          accessors=accs, bufferViews=bvs)

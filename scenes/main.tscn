@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://assets/world/JBR_Town.glb" id="w_town"]
 [ext_resource type="PackedScene" path="res://assets/world/JBR_FuelStop.glb" id="w_fuel"]
 [ext_resource type="PackedScene" path="res://assets/bar/Bar.glb" id="w_bar"]
+[ext_resource type="PackedScene" path="res://assets/bar/BarInterior.glb" id="w_bar_in"]
 [ext_resource type="PackedScene" path="res://assets/john/john.fbx" id="m_john"]
 [ext_resource type="PackedScene" path="res://assets/cars/m1.glb" id="m_car"]
 [ext_resource type="PackedScene" path="res://assets/chars/Visitor.glb" id="m_visitor"]
@@ -109,6 +110,8 @@ script = ExtResource("s_world")
 
 [node name="JBR_Bar" parent="World" instance=ExtResource("w_bar")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -76, -0.38, -33.7)
+
+[node name="BarInterior" parent="World/JBR_Bar" instance=ExtResource("w_bar_in")]
 
 [node name="Neon" type="OmniLight3D" parent="World/JBR_Bar"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.55, 2.0, -1.35)
